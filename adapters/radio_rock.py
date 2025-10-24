@@ -1,5 +1,8 @@
 import time
 
+import requests
+
+
 def fetch_current_song():
     retries = 3
     for i in range(retries):
