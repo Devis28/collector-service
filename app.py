@@ -5,7 +5,7 @@ from writer import save_data_to_r2
 
 SONG_PREFIX = "bronze/rock/song"
 LISTENERS_PREFIX = "bronze/rock/listeners"
-SEND_INTERVAL = 3600  # 1 hod (v sekundách)
+SEND_INTERVAL = 3600  # 1 hodina v sekundách
 
 def main():
     records = []
@@ -14,7 +14,7 @@ def main():
     t0 = time.time()
 
     def raw_song_id(song_data):
-        # Najrobustnejšia detekcia zmeny: porovnaj celú RAW odpoveď
+        # Porovnáva celú RAW dátovú štruktúru (robustné aj pri zmene schémy)
         return json.dumps(song_data, sort_keys=True)
 
     while True:

@@ -12,23 +12,24 @@ def fetch_current_song():
         try:
             resp = requests.get(SONG_URL, timeout=15)
             resp.raise_for_status()
-            # Vráť celé RAW response body (parsnuté na dict pre kompatibilitu so zvyškom)
-            return resp.json()
+            return resp.json()  # Ukladá všetko čo API pošle (kompletný RAW)
         except Exception as e:
             print(f"Attempt {i+1}/{retries} failed: {e}")
             time.sleep(3)
     return None
 
 def fetch_listeners_once():
-    try:
-        ws = websocket.create_connection(LISTENERS_WS_URL, timeout=10)
-        data = ws.recv()
-        ws.close()
-        # Vráť celé RAW dáta zo servera (možno dict, možno primitív)
+    retries = 3
+    for i in range(retries):
         try:
-            return json.loads(data)
-        except Exception:
-            return {"raw": data}
-    except Exception as e:
-        print(f"Error fetching listeners: {e}")
-        return None
+            ws = websocket.create_connection(LISTENERS_WS_URL, timeout=15)
+            data = ws.recv()
+            ws.close()
+            try:
+                return json.loads(data)
+            except Exception:
+                return {"raw": data}
+        except Exception as e:
+            print(f"Attempt {i+1}/{retries} fetch listeners failed: {e}")
+            time.sleep(3)
+    return None
