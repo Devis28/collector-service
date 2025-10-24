@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 import boto3
 from botocore.client import Config
 
-# Načítaj environment variables z .env
 load_dotenv()
 
 R2_ENDPOINT = os.getenv("R2_ENDPOINT")
@@ -13,7 +12,6 @@ R2_KEY_ID = os.getenv("R2_KEY_ID")
 R2_SECRET = os.getenv("R2_SECRET")
 R2_BUCKET = os.getenv("R2_BUCKET")
 
-# Boto3 S3 klient pre R2
 session = boto3.session.Session()
 s3 = session.client(
     service_name="s3",
@@ -24,12 +22,6 @@ s3 = session.client(
 )
 
 def save_data_to_r2(data, prefix):
-    """
-    Uloží dáta do R2 (Cloudflare Object Storage).
-    :param data: Čo ukladať (dikt/list)
-    :param prefix: cesta/prefix do bucketu (pr. bronze/rock/song alebo bronze/rock/listeners)
-    :return: None
-    """
     timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
     filename = f"{prefix}/{timestamp}.json"
     try:
