@@ -14,7 +14,7 @@ def fetch_current_song():
             resp.raise_for_status()
             return resp.json()  # Ukladá všetko čo API pošle (kompletný RAW)
         except Exception as e:
-            print(f"Attempt {i+1}/{retries} failed: {e}")
+            print(f"Attempt {i+1}/{retries} get song failed: {e}")
             time.sleep(3)
     return None
 
@@ -22,7 +22,7 @@ def fetch_listeners_once():
     retries = 3
     for i in range(retries):
         try:
-            ws = websocket.create_connection(LISTENERS_WS_URL, timeout=15)
+            ws = websocket.create_connection(LISTENERS_WS_URL, timeout=20)
             data = ws.recv()
             ws.close()
             try:
@@ -31,5 +31,5 @@ def fetch_listeners_once():
                 return {"raw": data}
         except Exception as e:
             print(f"Attempt {i+1}/{retries} fetch listeners failed: {e}")
-            time.sleep(3)
+            time.sleep(4)
     return None

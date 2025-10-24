@@ -5,7 +5,7 @@ from writer import save_data_to_r2
 
 SONG_PREFIX = "bronze/rock/song"
 LISTENERS_PREFIX = "bronze/rock/listeners"
-SEND_INTERVAL = 3600  # 1 hodina v sekundách
+SEND_INTERVAL = 600  # 10 minút v sekundách (10 * 60 = 600)
 
 def main():
     records = []
