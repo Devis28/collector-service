@@ -1,3 +1,5 @@
+requests
+websocket-client
 python-dotenv
 boto3
 botocore
