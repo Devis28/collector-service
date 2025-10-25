@@ -7,6 +7,8 @@ from writer import save_data_to_r2
 SONG_PREFIX = "bronze/rock/song"
 LISTENERS_PREFIX = "bronze/rock/listeners"
 SEND_INTERVAL = 600  # 10 minút v sekundách
+SONG_CHECK_INTERVAL = 60  # Kontrola skladby každú minútu
+LISTENERS_DELAY = 20  # Čakanie 20 sekúnd pred získaním listeners
 
 
 def main():
@@ -17,6 +19,8 @@ def main():
 
     print(f"[APP] Starting collector service at {datetime.now()}")
     print(f"[APP] Upload interval: {SEND_INTERVAL} seconds ({SEND_INTERVAL // 60} minutes)")
+    print(f"[APP] Song check interval: {SONG_CHECK_INTERVAL} seconds")
+    print(f"[APP] Listeners delay after new song: {LISTENERS_DELAY} seconds")
 
     def song_id_from_data(song_data):
         # Porovnávaj len obsah 'song', nie 'last_update'
@@ -40,7 +44,11 @@ def main():
                 author = song_info.get('musicAuthor', 'Unknown')
                 print(f"[APP] New song detected and recorded: {author} - {title}")
 
-                # Hneď získaj listeners pre túto skladbu
+                # Čakaj 20 sekúnd pred získaním listeners
+                print(f"[APP] Waiting {LISTENERS_DELAY} seconds before fetching listeners...")
+                time.sleep(LISTENERS_DELAY)
+
+                # Teraz získaj listeners pre túto skladbu
                 listeners = radio_rock.fetch_listeners_once()
                 if listeners:
                     listeners_records.append(listeners)
@@ -60,8 +68,8 @@ def main():
                 listeners_records.clear()
             t0 = time.time()
 
-        # Čakaj 20 sekúnd pred ďalšou kontrolou
-        time.sleep(20)
+        # Čakaj 1 minútu pred ďalšou kontrolou skladby
+        time.sleep(SONG_CHECK_INTERVAL)
 
 
 if __name__ == "__main__":
