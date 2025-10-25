@@ -44,7 +44,7 @@ def fetch_listeners_once():
                 # Výpis celého JSON objektu
                 print(f"[ROCK DEBUG] Parsed JSON: {listeners_data}")
 
-                count = listeners_data.get('listenership', 'Unknown')
+                count = listeners_data.get('listeners', 'Unknown')
                 print(f"[ROCK] Listeners fetched: {count}")
                 return listeners_data
             except Exception as e:
