@@ -31,23 +31,33 @@ def fetch_current_song():
             data = response.json()
             data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
             data['song_session_id'] = str(uuid.uuid4())
+            # Pridaj informáciu o štruktúre: je pesnička? chýba niečo?
+            data['raw_valid'] = False
+            if 'song' in data and isinstance(data['song'], dict):
+                ref = data['song']
+                data['raw_valid'] = (
+                    ref.get('musicTitle') and ref.get('musicAuthor') and ref.get('startTime')
+                ) is not None
             return data
     except Exception as e:
         print(f"{now_log()}[ROCK] Error fetching song: {e}", flush=True)
     return None
+
 
 def fetch_listeners_once():
     try:
         ws = websocket.create_connection(LISTENERS_WS_URL, timeout=20)
         data = ws.recv()
         ws.close()
+        # Vždy zápis všetko čo prišlo
         listeners_data = json.loads(data)
         listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
-        print(f"{now_log()}[ROCK] Listeners recorded: {listeners_data.get('listeners', 'Unknown')}", flush=True)
+        listeners_data['raw_valid'] = 'listeners' in listeners_data and isinstance(listeners_data['listeners'], int)
         return listeners_data
     except Exception as e:
         print(f"{now_log()}[ROCK] Error fetching listeners: {e}", flush=True)
     return None
+
 
 def process_and_log_song(last_signature):
     song_data = fetch_current_song()
