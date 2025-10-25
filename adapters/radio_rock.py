@@ -35,18 +35,23 @@ def fetch_listeners_once():
             ws = websocket.create_connection(LISTENERS_WS_URL, timeout=20)
             data = ws.recv()
             ws.close()
+
+            # NOVÝ RIADOK - Výpis RAW dát
+            print(f"[ROCK DEBUG] Raw listeners data: {data}")
+
             try:
                 listeners_data = json.loads(data)
+                # Výpis celého JSON objektu
+                print(f"[ROCK DEBUG] Parsed JSON: {listeners_data}")
 
-                # Log pri úspešnom získaní listeners
                 count = listeners_data.get('listenership', 'Unknown')
                 print(f"[ROCK] Listeners fetched: {count}")
-
                 return listeners_data
-            except Exception:
-                print(f"[ROCK] Listeners fetched (raw data)")
+            except Exception as e:
+                print(f"[ROCK] JSON parse error: {e}, raw data: {data}")
                 return {"raw": data}
         except Exception as e:
             print(f"[ROCK] Attempt {i + 1}/{retries} fetch listeners failed: {e}")
             time.sleep(4)
     return None
+
