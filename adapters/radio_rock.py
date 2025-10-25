@@ -6,17 +6,27 @@ import time
 SONG_URL = "https://rock-server.fly.dev/pull/playing"
 LISTENERS_WS_URL = "wss://rock-server.fly.dev/ws/push/listenership"
 
+
 def fetch_current_song():
     retries = 3
     for i in range(retries):
         try:
             resp = requests.get(SONG_URL, timeout=15)
             resp.raise_for_status()
-            return resp.json()  # Ukladá všetko čo API pošle (kompletný RAW)
+            data = resp.json()
+
+            # Log pri úspešnom získaní skladby
+            song_info = data.get('song', {})
+            title = song_info.get('musicTitle', 'Unknown')
+            author = song_info.get('musicAuthor', 'Unknown')
+            print(f"[ROCK] Song fetched: {author} - {title}")
+
+            return data
         except Exception as e:
-            print(f"Attempt {i+1}/{retries} get song failed: {e}")
+            print(f"[ROCK] Attempt {i + 1}/{retries} get song failed: {e}")
             time.sleep(3)
     return None
+
 
 def fetch_listeners_once():
     retries = 3
@@ -26,10 +36,17 @@ def fetch_listeners_once():
             data = ws.recv()
             ws.close()
             try:
-                return json.loads(data)
+                listeners_data = json.loads(data)
+
+                # Log pri úspešnom získaní listeners
+                count = listeners_data.get('listenership', 'Unknown')
+                print(f"[ROCK] Listeners fetched: {count}")
+
+                return listeners_data
             except Exception:
+                print(f"[ROCK] Listeners fetched (raw data)")
                 return {"raw": data}
         except Exception as e:
-            print(f"Attempt {i+1}/{retries} fetch listeners failed: {e}")
+            print(f"[ROCK] Attempt {i + 1}/{retries} fetch listeners failed: {e}")
             time.sleep(4)
     return None

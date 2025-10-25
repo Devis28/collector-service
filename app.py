@@ -1,5 +1,6 @@
 import time
 import json
+from datetime import datetime
 from adapters import radio_rock
 from writer import save_data_to_r2
 
@@ -13,6 +14,9 @@ def main():
     listeners_records = []
     last_song_id = None
     t0 = time.time()
+
+    print(f"[APP] Starting collector service at {datetime.now()}")
+    print(f"[APP] Upload interval: {SEND_INTERVAL} seconds ({SEND_INTERVAL // 60} minutes)")
 
     def raw_song_id(song_data):
         # Porovnáva celú RAW dátovú štruktúru
@@ -29,23 +33,29 @@ def main():
                 # Zaznamenaj novú skladbu
                 records.append(song_data)
                 last_song_id = song_id
-                print(f"New song detected: {song_data.get('song', {}).get('musicTitle', 'Unknown')}")
+
+                song_info = song_data.get('song', {})
+                title = song_info.get('musicTitle', 'Unknown')
+                author = song_info.get('musicAuthor', 'Unknown')
+                print(f"[APP] New song detected and recorded: {author} - {title}")
 
                 # Hneď získaj listeners pre túto skladbu
                 listeners = radio_rock.fetch_listeners_once()
                 if listeners:
                     listeners_records.append(listeners)
-                    print(f"Listeners captured: {listeners}")
+                    count = listeners.get('listenership', 'Unknown')
+                    print(f"[APP] Listeners recorded: {count}")
 
         # Odoslanie batchu každých 10 minút
         if (time.time() - t0) >= SEND_INTERVAL:
+            print(f"[APP] Upload interval reached at {datetime.now()}")
             if records:
                 save_data_to_r2(records, SONG_PREFIX)
-                print(f"Saved {len(records)} songs to R2")
+                print(f"[APP] ✓ Saved {len(records)} songs to R2")
                 records.clear()
             if listeners_records:
                 save_data_to_r2(listeners_records, LISTENERS_PREFIX)
-                print(f"Saved {len(listeners_records)} listeners to R2")
+                print(f"[APP] ✓ Saved {len(listeners_records)} listeners to R2")
                 listeners_records.clear()
             t0 = time.time()
 
