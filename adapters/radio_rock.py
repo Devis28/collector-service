@@ -32,7 +32,7 @@ def fetch_current_song():
             data['song_session_id'] = str(uuid.uuid4())
             return data
     except Exception as e:
-        print(f"{now_log()}[ROCK] Error fetching song for RADIO ROCK: {e}")
+        print(f"{now_log()}[ROCK] Error fetching song: {e}")
     return None
 
 def fetch_listeners_once():
@@ -42,10 +42,10 @@ def fetch_listeners_once():
         ws.close()
         listeners_data = json.loads(data)
         listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
-        print(f"{now_log()}[ROCK] Listeners recorded: {listeners_data.get('listeners', 'Unknown')} for RADIO ROCK")
+        print(f"{now_log()}[ROCK] Listeners recorded: {listeners_data.get('listeners', 'Unknown')}")
         return listeners_data
     except Exception as e:
-        print(f"{now_log()}[ROCK] Error fetching listeners for RADIO ROCK: {e}")
+        print(f"{now_log()}[ROCK] Error fetching listeners: {e}")
     return None
 
 def process_and_log_song(last_signature):
@@ -62,7 +62,7 @@ def process_and_log_song(last_signature):
     return None, last_signature
 
 def process_and_log_listeners(song_signature):
-    print(f"{now_log()}[ROCK] Waiting {LISTENERS_DELAY}s before fetching listeners for RADIO ROCK...")
+    print(f"{now_log()}[ROCK] Waiting {LISTENERS_DELAY}s before fetching listeners...")
     time.sleep(LISTENERS_DELAY)
     for attempt in range(LISTENERS_RETRY_ATTEMPTS):
         song_data_check = fetch_current_song()
@@ -74,7 +74,7 @@ def process_and_log_listeners(song_signature):
             if listeners_data:
                 return listeners_data
         else:
-            print(f"{now_log()}[ROCK] Song changed during listeners retry for RADIO ROCK, not recording listeners.")
+            print(f"{now_log()}[ROCK] Song changed during listeners retry, not recording listeners.")
             break
         if attempt < LISTENERS_RETRY_ATTEMPTS - 1:
             print(f"{now_log()}[ROCK] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s...")
