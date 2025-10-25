@@ -29,11 +29,11 @@ def main():
         # Upload každých 10 minút
         if time.time() - t0 >= SEND_INTERVAL:
             if records:
-                print(f"[WRITER] Saving {len(records)} song records for Rádio ROCK to {SONG_PREFIX}")
+                print(f"[WRITER] Saving {len(records)} song records for RADIO ROCK to {SONG_PREFIX}")
                 save_data_to_r2(records, SONG_PREFIX)
                 records = []
             if listeners_records:
-                print(f"[WRITER] Saving {len(listeners_records)} listeners records for Rádio ROCK to {LISTENERS_PREFIX}")
+                print(f"[WRITER] Saving {len(listeners_records)} listeners records for RADIO ROCK to {LISTENERS_PREFIX}")
                 save_data_to_r2(listeners_records, LISTENERS_PREFIX)
                 listeners_records = []
             t0 = time.time()

@@ -29,7 +29,7 @@ def fetch_current_song():
             data['song_session_id'] = str(uuid.uuid4())
             return data
     except Exception as e:
-        print(f"[ADAPTER] Error fetching song for Rádio ROCK: {e}")
+        print(f"[ROCK] Error fetching song for RADIO ROCK: {e}")
     return None
 
 def fetch_listeners_once():
@@ -39,10 +39,10 @@ def fetch_listeners_once():
         ws.close()
         listeners_data = json.loads(data)
         listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
-        print(f"[ADAPTER] Listeners recorded: {listeners_data.get('listeners', 'Unknown')} for Rádio ROCK")
+        print(f"[ROCK] Listeners recorded: {listeners_data.get('listeners', 'Unknown')} for RADIO ROCK")
         return listeners_data
     except Exception as e:
-        print(f"[ADAPTER] Error fetching listeners for Rádio ROCK: {e}")
+        print(f"[ROCK] Error fetching listeners for RADIO ROCK: {e}")
     return None
 
 def process_and_log_song(last_signature):
@@ -53,13 +53,13 @@ def process_and_log_song(last_signature):
     if song_signature != last_signature:
         artist = song_data.get('song', {}).get('musicAuthor', 'Unknown')
         title = song_data.get('song', {}).get('musicTitle', 'Unknown')
-        print(f"[ADAPTER] Song recorded: {artist} - {title} (Rádio ROCK)")
-        print(f"[ADAPTER] Data source: API | Processing: ADAPTER | Target storage: bronze/rock/song")
+        print(f"[ROCK] Song recorded: {artist} - {title} (RADIO ROCK)")
+        print(f"[ROCK] Data source: API | Processing: ROCK | Target storage: bronze/rock/song")
         return song_data, song_signature
     return None, last_signature
 
 def process_and_log_listeners(song_signature):
-    print(f"[ADAPTER] Waiting {LISTENERS_DELAY}s before fetching listeners for Rádio ROCK...")
+    print(f"[ROCK] Waiting {LISTENERS_DELAY}s before fetching listeners for RADIO ROCK...")
     time.sleep(LISTENERS_DELAY)
     for attempt in range(LISTENERS_RETRY_ATTEMPTS):
         song_data_check = fetch_current_song()
@@ -71,9 +71,9 @@ def process_and_log_listeners(song_signature):
             if listeners_data:
                 return listeners_data
         else:
-            print("[ADAPTER] Song changed during listeners retry for Rádio ROCK, not recording listeners.")
+            print("[ROCK] Song changed during listeners retry for RADIO ROCK, not recording listeners.")
             break
         if attempt < LISTENERS_RETRY_ATTEMPTS - 1:
-            print(f"[ADAPTER] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s... (Rádio ROCK)")
+            print(f"[ROCK] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s... (RADIO ROCK)")
             time.sleep(LISTENERS_RETRY_DELAY)
     return None
