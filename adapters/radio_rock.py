@@ -3,6 +3,7 @@ import websocket
 import json
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import uuid
 
 SONG_URL = "https://rock-server.fly.dev/pull/playing"
@@ -12,7 +13,7 @@ LISTENERS_RETRY_ATTEMPTS = 3
 LISTENERS_RETRY_DELAY = 10
 
 def now_log():
-    return datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
 
 def extract_song_signature(song_data):
     if 'song' in song_data and isinstance(song_data['song'], dict):
@@ -72,7 +73,8 @@ def process_and_log_listeners(song_signature):
         if current_signature == song_signature:
             listeners_data = fetch_listeners_once()
             if listeners_data:
-                # Výpis úspechu s detailom o skladbe a počte listeners
+                # session_id bude priradené v app.py – tu to nechaj prázdne,
+                # pretože session_id je známe v app.py po spárovaní
                 artist = song_data_check.get('song', {}).get('musicAuthor', 'Unknown')
                 title = song_data_check.get('song', {}).get('musicTitle', 'Unknown')
                 listeners = listeners_data.get('listeners', 'Unknown')
