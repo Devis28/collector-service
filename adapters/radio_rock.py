@@ -72,6 +72,12 @@ def process_and_log_listeners(song_signature):
         if current_signature == song_signature:
             listeners_data = fetch_listeners_once()
             if listeners_data:
+                # Výpis úspechu s detailom o skladbe a počte listeners
+                artist = song_data_check.get('song', {}).get('musicAuthor', 'Unknown')
+                title = song_data_check.get('song', {}).get('musicTitle', 'Unknown')
+                listeners = listeners_data.get('listeners', 'Unknown')
+                print(f"{now_log()}[ROCK] SUCCESS recorded pair: {artist} - {title} (listeners={listeners})")
+                print(f"{now_log()}[ROCK] Waiting for next song...")
                 return listeners_data
         else:
             print(f"{now_log()}[ROCK] Song changed during listeners retry, not recording listeners.")
@@ -79,4 +85,5 @@ def process_and_log_listeners(song_signature):
         if attempt < LISTENERS_RETRY_ATTEMPTS - 1:
             print(f"{now_log()}[ROCK] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s...")
             time.sleep(LISTENERS_RETRY_DELAY)
+    print(f"{now_log()}[ROCK] Waiting for next song...")
     return None
