@@ -18,17 +18,18 @@ def main():
     print(f"[APP] Starting collector service at {datetime.now()}")
     print(f"[APP] Upload interval: {SEND_INTERVAL} seconds ({SEND_INTERVAL // 60} minutes)")
 
-    def raw_song_id(song_data):
-        # Porovnáva celú RAW dátovú štruktúru
-        return json.dumps(song_data, sort_keys=True)
+    def song_id_from_data(song_data):
+        # Porovnávaj len obsah 'song', nie 'last_update'
+        song_info = song_data.get('song', {})
+        return json.dumps(song_info, sort_keys=True)
 
     while True:
         song_data = radio_rock.fetch_current_song()
 
         if song_data:
-            song_id = raw_song_id(song_data)
+            song_id = song_id_from_data(song_data)
 
-            # Ak sa skladba zmenila
+            # Ak sa skladba zmenila (porovnanie len song objektu)
             if last_song_id != song_id:
                 # Zaznamenaj novú skladbu
                 records.append(song_data)
