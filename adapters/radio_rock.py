@@ -8,7 +8,7 @@ import uuid
 SONG_URL = "https://rock-server.fly.dev/pull/playing"
 LISTENERS_WS_URL = "wss://rock-server.fly.dev/ws/push/listenership"
 
-def fetch_current_song():
+def fetch_current_song(print_log=True):
     retries = 3
     for i in range(retries):
         try:
@@ -17,14 +17,17 @@ def fetch_current_song():
                 data = response.json()
                 data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
                 data['song_session_id'] = str(uuid.uuid4())
-                artist = data.get('song', {}).get('musicAuthor', 'Unknown')
-                title = data.get('song', {}).get('musicTitle', 'Unknown')
-                print(f"[ROCK] Song recorded: {artist} - {title}")
+                if print_log:
+                    artist = data.get('song', {}).get('musicAuthor', 'Unknown')
+                    title = data.get('song', {}).get('musicTitle', 'Unknown')
+                    print(f"[ROCK] Song recorded: {artist} - {title}")
                 return data
             else:
-                print(f"[ROCK] Attempt {i+1}/{retries} record song failed: HTTP {response.status_code}")
+                if print_log:
+                    print(f"[ROCK] Attempt {i+1}/{retries} record song failed: HTTP {response.status_code}")
         except Exception as e:
-            print(f"[ROCK] Attempt {i+1}/{retries} record song failed: {e}")
+            if print_log:
+                print(f"[ROCK] Attempt {i+1}/{retries} record song failed: {e}")
         time.sleep(3)
     return None
 
