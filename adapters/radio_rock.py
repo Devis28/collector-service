@@ -33,7 +33,7 @@ def fetch_current_song():
             data['song_session_id'] = str(uuid.uuid4())
             return data
     except Exception as e:
-        print(f"{now_log()}[ROCK] Error fetching song: {e}")
+        print(f"{now_log()}[ROCK] Error fetching song: {e}", flush=True)
     return None
 
 def fetch_listeners_once():
@@ -43,10 +43,10 @@ def fetch_listeners_once():
         ws.close()
         listeners_data = json.loads(data)
         listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
-        print(f"{now_log()}[ROCK] Listeners recorded: {listeners_data.get('listeners', 'Unknown')}")
+        print(f"{now_log()}[ROCK] Listeners recorded: {listeners_data.get('listeners', 'Unknown')}", flush=True)
         return listeners_data
     except Exception as e:
-        print(f"{now_log()}[ROCK] Error fetching listeners: {e}")
+        print(f"{now_log()}[ROCK] Error fetching listeners: {e}", flush=True)
     return None
 
 def process_and_log_song(last_signature):
@@ -57,13 +57,13 @@ def process_and_log_song(last_signature):
     if song_signature != last_signature:
         artist = song_data.get('song', {}).get('musicAuthor', 'Unknown')
         title = song_data.get('song', {}).get('musicTitle', 'Unknown')
-        print(f"{now_log()}[ROCK] Song recorded: {artist} - {title}")
-        print(f"{now_log()}[ROCK] Data source: API | Processing: ROCK | Target storage: bronze/rock/song")
+        print(f"{now_log()}[ROCK] Song recorded: {artist} - {title}", flush=True)
+        print(f"{now_log()}[ROCK] Data source: API | Processing: ROCK | Target storage: bronze/rock/song", flush=True)
         return song_data, song_signature
     return None, last_signature
 
 def process_and_log_listeners(song_signature):
-    print(f"{now_log()}[ROCK] Waiting {LISTENERS_DELAY}s before fetching listeners...")
+    print(f"{now_log()}[ROCK] Waiting {LISTENERS_DELAY}s before fetching listeners...", flush=True)
     time.sleep(LISTENERS_DELAY)
     for attempt in range(LISTENERS_RETRY_ATTEMPTS):
         song_data_check = fetch_current_song()
@@ -73,19 +73,17 @@ def process_and_log_listeners(song_signature):
         if current_signature == song_signature:
             listeners_data = fetch_listeners_once()
             if listeners_data:
-                # session_id bude priradené v app.py – tu to nechaj prázdne,
-                # pretože session_id je známe v app.py po spárovaní
                 artist = song_data_check.get('song', {}).get('musicAuthor', 'Unknown')
                 title = song_data_check.get('song', {}).get('musicTitle', 'Unknown')
                 listeners = listeners_data.get('listeners', 'Unknown')
-                print(f"{now_log()}[ROCK] SUCCESS recorded pair: {artist} - {title} (listeners={listeners})")
-                print(f"{now_log()}[ROCK] Waiting for next song...")
+                print(f"{now_log()}[ROCK] SUCCESS recorded pair: {artist} - {title} (listeners={listeners})", flush=True)
+                print(f"{now_log()}[ROCK] Waiting for next song...", flush=True)
                 return listeners_data
         else:
-            print(f"{now_log()}[ROCK] Song changed during listeners retry, not recording listeners.")
+            print(f"{now_log()}[ROCK] Song changed during listeners retry, not recording listeners.", flush=True)
             break
         if attempt < LISTENERS_RETRY_ATTEMPTS - 1:
-            print(f"{now_log()}[ROCK] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s...")
+            print(f"{now_log()}[ROCK] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s...", flush=True)
             time.sleep(LISTENERS_RETRY_DELAY)
-    print(f"{now_log()}[ROCK] Waiting for next song...")
+    print(f"{now_log()}[ROCK] Waiting for next song...", flush=True)
     return None

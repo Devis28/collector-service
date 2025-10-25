@@ -19,7 +19,7 @@ def main():
     last_song_session_id = None
     t0 = time.time()
 
-    print(f"{now_log()}[APP] Starting collector service at {datetime.now(ZoneInfo('Europe/Bratislava'))}")
+    print(f"{now_log()}[APP] Starting collector service at {datetime.now(ZoneInfo('Europe/Bratislava'))}", flush=True)
 
     while True:
         song_data, song_signature = radio_rock.process_and_log_song(last_song_signature)
@@ -30,18 +30,16 @@ def main():
 
             listeners_data = radio_rock.process_and_log_listeners(song_signature=song_signature)
             if listeners_data:
-                # Pridané: session_id do každého listeners záznamu
                 listeners_data['song_session_id'] = last_song_session_id
                 listeners_records.append(listeners_data)
 
-        # Upload každých 10 minút
         if time.time() - t0 >= SEND_INTERVAL:
             if records:
-                print(f"{now_log()}[WRITER] Saving {len(records)} song records for ROCK to {SONG_PREFIX}")
+                print(f"{now_log()}[WRITER] Saving {len(records)} song records for ROCK to {SONG_PREFIX}", flush=True)
                 save_data_to_r2(records, SONG_PREFIX)
                 records = []
             if listeners_records:
-                print(f"{now_log()}[WRITER] Saving {len(listeners_records)} listeners records for ROCK to {LISTENERS_PREFIX}")
+                print(f"{now_log()}[WRITER] Saving {len(listeners_records)} listeners records for ROCK to {LISTENERS_PREFIX}", flush=True)
                 save_data_to_r2(listeners_records, LISTENERS_PREFIX)
                 listeners_records = []
             t0 = time.time()
