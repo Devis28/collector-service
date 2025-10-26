@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from adapters import radio_rock, radio_beta, radio_funradio
+from adapters import radio_rock, radio_beta, radio_funradio, radio_melody
 from writer import save_data_to_r2
 
 SEND_INTERVAL = 600         # interval pre upload (10 minút)
@@ -29,6 +29,12 @@ def main():
             "song_prefix": "bronze/funradio/song",
             "listeners_prefix": "bronze/funradio/listeners",
             "label": "FUNRADIO"
+        },
+        {
+            "module": radio_melody,                    # <-- pridaj konfiguráciu Melody
+            "song_prefix": "bronze/melody/song",
+            "listeners_prefix": "bronze/melody/listeners",
+            "label": "MELODY"
         }
     ]
     state = {}
