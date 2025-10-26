@@ -48,6 +48,24 @@ def extract_song_signature(song_data):
             return f"{author}|{title}|{start_time}"
     return ""
 
+def process_and_log_song(last_song_signature):
+    song_data = fetch_current_song()
+    if not song_data:
+        return None, last_song_signature
+    song_signature = extract_song_signature(song_data)
+    song_data['song_session_id'] = None
+    if song_signature != last_song_signature:
+        song_data['song_session_id'] = str(uuid.uuid4())
+        print(f"{now_log()}[FUNRADIO] New song, signature: {song_signature}, session_id: {song_data['song_session_id']}", flush=True)
+        # Tu môže byť logika uloženia, ak treba
+    return song_data, song_signature
+
+def process_and_log_listeners(song_signature=None):
+    listeners_data = fetch_listeners_once()
+    # Tu môžeš vkladať ďalšiu logiku, napr. priradenie song_session_id podľa potreby...
+    return listeners_data
+
+
 def main_loop():
     last_signature = ""
     current_song_session_id = None
