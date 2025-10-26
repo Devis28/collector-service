@@ -4,6 +4,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import boto3
 from botocore.client import Config
+from zoneinfo import ZoneInfo       # <-- toto pridaj
 
 load_dotenv()
 
@@ -22,7 +23,8 @@ s3 = session.client(
 )
 
 def save_data_to_r2(data, prefix):
-    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    # Používaj lokálny čas (Europe/Bratislava) pre názov
+    timestamp = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%Y-%m-%dT%H-%M-%S")
     filename = f"{prefix}/{timestamp}.json"
     try:
         s3.put_object(
