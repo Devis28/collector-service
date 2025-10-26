@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import uuid
 
 SONG_URL = "https://funradio-server.fly.dev/pull/playing"
-LISTENERS_WS_URL = "wss://funradio-server.fly.dev/wspush/listenership"
+LISTENERS_WS_URL = "wss://funradio-server.fly.dev/ws/push/listenership"
 LISTENERS_DELAY = 20
 LISTENERS_RETRY_ATTEMPTS = 3
 LISTENERS_RETRY_DELAY = 10
