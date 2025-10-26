@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from adapters import radio_rock, radio_beta, radio_funradio, radio_melody
 from writer import save_data_to_r2
 
-SEND_INTERVAL = 600         # interval pre upload (10 minút)
+SEND_INTERVAL = 7200         # interval pre upload (10 minút)
 SONG_CHECK_INTERVAL = 30    # interval pre kontrolu skladby (30 sekúnd)
 
 def now_log():
