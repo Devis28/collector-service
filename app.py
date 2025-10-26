@@ -1,14 +1,49 @@
 import time
+import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from adapters import radio_rock, radio_beta, radio_funradio, radio_melody
 from writer import save_data_to_r2
 
-SEND_INTERVAL = 7200         # interval pre upload (10 minút)
-SONG_CHECK_INTERVAL = 30    # interval pre kontrolu skladby (30 sekúnd)
+SEND_INTERVAL = 7200           # interval pre upload (2 hod.)
+SONG_CHECK_INTERVAL = 30       # interval pre kontrolu skladby (30 sekúnd)
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
+
+def run_radio(cfg):
+    state = {
+        "last_song_signature": None,
+        "last_song_session_id": None,
+        "records": [],
+        "listeners_records": []
+    }
+    t0 = time.time()
+    radio = cfg["module"]
+    print(f"{now_log()}[THREAD] Starting {cfg['label']}", flush=True)
+    while True:
+        song_data, song_signature = radio.process_and_log_song(state["last_song_signature"])
+        if song_data:
+            state["last_song_signature"] = song_signature
+            state["last_song_session_id"] = song_data.get('song_session_id')
+            state["records"].append(song_data)
+
+            listeners_data = radio.process_and_log_listeners(song_signature=song_signature)
+            if listeners_data:
+                listeners_data["song_session_id"] = state["last_song_session_id"]
+                state["listeners_records"].append(listeners_data)
+
+        if time.time() - t0 >= SEND_INTERVAL:
+            if state["records"]:
+                print(f"{now_log()}[WRITER] Saving {len(state['records'])} song records for {cfg['label']} to {cfg['song_prefix']}", flush=True)
+                save_data_to_r2(state["records"], cfg["song_prefix"])
+                state["records"] = []
+            if state["listeners_records"]:
+                print(f"{now_log()}[WRITER] Saving {len(state['listeners_records'])} listeners records for {cfg['label']} to {cfg['listeners_prefix']}", flush=True)
+                save_data_to_r2(state["listeners_records"], cfg["listeners_prefix"])
+                state["listeners_records"] = []
+            t0 = time.time()
+        time.sleep(SONG_CHECK_INTERVAL)
 
 def main():
     configs = [
@@ -31,50 +66,20 @@ def main():
             "label": "FUNRADIO"
         },
         {
-            "module": radio_melody,                    # <-- pridaj konfiguráciu Melody
+            "module": radio_melody,
             "song_prefix": "bronze/melody/song",
             "listeners_prefix": "bronze/melody/listeners",
             "label": "MELODY"
         }
     ]
-    state = {}
-    t0 = time.time()
+    threads = []
     for cfg in configs:
-        state[cfg['label']] = {
-            "last_song_signature": None,
-            "last_song_session_id": None,
-            "records": [],
-            "listeners_records": []
-        }
-    print(f"{now_log()}[APP] Starting collector service at {datetime.now(ZoneInfo('Europe/Bratislava'))}", flush=True)
+        t = threading.Thread(target=run_radio, args=(cfg,), daemon=True)
+        t.start()
+        threads.append(t)
+    print(f"{now_log()}[APP] All radio threads started...", flush=True)
     while True:
-        for cfg in configs:
-            radio = cfg["module"]
-            s = state[cfg["label"]]
-            song_data, song_signature = radio.process_and_log_song(s["last_song_signature"])
-            if song_data:
-                s["last_song_signature"] = song_signature
-                s["last_song_session_id"] = song_data.get('song_session_id')
-                s["records"].append(song_data)
-
-                listeners_data = radio.process_and_log_listeners(song_signature=song_signature)
-                if listeners_data:
-                    listeners_data["song_session_id"] = s["last_song_session_id"]
-                    s["listeners_records"].append(listeners_data)
-
-        if time.time() - t0 >= SEND_INTERVAL:
-            for cfg in configs:
-                s = state[cfg["label"]]
-                if s["records"]:
-                    print(f"{now_log()}[WRITER] Saving {len(s['records'])} song records for {cfg['label']} to {cfg['song_prefix']}", flush=True)
-                    save_data_to_r2(s["records"], cfg["song_prefix"])
-                    s["records"] = []
-                if s["listeners_records"]:
-                    print(f"{now_log()}[WRITER] Saving {len(s['listeners_records'])} listeners records for {cfg['label']} to {cfg['listeners_prefix']}", flush=True)
-                    save_data_to_r2(s["listeners_records"], cfg["listeners_prefix"])
-                    s["listeners_records"] = []
-            t0 = time.time()
-        time.sleep(SONG_CHECK_INTERVAL)
+        time.sleep(60)   # hlavný thread môže slúžiť na monitorovanie alebo jednoduchý watchdog
 
 if __name__ == "__main__":
     main()
