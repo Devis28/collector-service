@@ -8,9 +8,7 @@ import uuid
 
 SONG_URL = "https://funradio-server.fly.dev/pull/playing"
 LISTENERS_WS_URL = "wss://funradio-server.fly.dev/ws/push/listenership"
-LISTENERS_DELAY = 20
-LISTENERS_RETRY_ATTEMPTS = 3
-LISTENERS_RETRY_DELAY = 10
+LISTENERS_INTERVAL = 30
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -21,14 +19,6 @@ def fetch_current_song():
         if response.status_code == 200:
             data = response.json()
             data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
-            data['song_session_id'] = str(uuid.uuid4())
-            # Meta pre pôvodnú štruktúru – pre reporting (nie pre zápis)
-            data['raw_valid'] = (
-                isinstance(data.get('song'), dict) and
-                'musicTitle' in data['song'] and
-                'musicAuthor' in data['song'] and
-                'startTime' in data['song']
-            )
             print(f"{now_log()}[FUNRADIO] RAW NOW-PLAYING DATA: {json.dumps(data, ensure_ascii=False)}", flush=True)
             return data
     except Exception as e:
@@ -42,8 +32,6 @@ def fetch_listeners_once():
         ws.close()
         listeners_data = json.loads(data)
         listeners_data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
-        # Meta pre validitu podľa pôvodného očakávania
-        listeners_data['raw_valid'] = ('listeners' in listeners_data and isinstance(listeners_data['listeners'], int))
         print(f"{now_log()}[FUNRADIO] RAW LISTENERS DATA: {json.dumps(listeners_data, ensure_ascii=False)}", flush=True)
         return listeners_data
     except Exception as e:
@@ -51,7 +39,6 @@ def fetch_listeners_once():
     return None
 
 def extract_song_signature(song_data):
-    # Bezpečný fallback na signature (pre reporting)
     if 'song' in song_data and isinstance(song_data['song'], dict):
         ref = song_data['song']
         title = ref.get('musicTitle') or ref.get('title') or ''
@@ -61,28 +48,38 @@ def extract_song_signature(song_data):
             return f"{author}|{title}|{start_time}"
     return ""
 
-def process_and_log_song(last_signature):
-    song_data = fetch_current_song()
-    if not song_data:
-        return None, last_signature
-    song_signature = extract_song_signature(song_data)
-    # Uloží len ak sa zmenila signature (nový song podľa autor|názov|čas)
-    if song_signature and song_signature != last_signature:
-        print(f"{now_log()}[FUNRADIO] Song session: {song_data.get('song_session_id', None)}, signature: {song_signature}", flush=True)
-        return song_data, song_signature
-    print(f"{now_log()}[FUNRADIO] SAME song, skip save: {song_signature}", flush=True)
-    return None, last_signature
+def main_loop():
+    last_signature = ""
+    current_song_session_id = None
 
+    while True:
+        song_data = fetch_current_song()
+        if not song_data:
+            time.sleep(5)
+            continue
 
-def process_and_log_listeners(song_signature):
-    print(f"{now_log()}[FUNRADIO] Waiting {LISTENERS_DELAY}s before fetching listeners...", flush=True)
-    time.sleep(LISTENERS_DELAY)
-    for attempt in range(LISTENERS_RETRY_ATTEMPTS):
-        listeners_data = fetch_listeners_once()
-        if listeners_data:
-            return listeners_data
-        if attempt < LISTENERS_RETRY_ATTEMPTS - 1:
-            print(f"{now_log()}[FUNRADIO] Listeners retry {attempt+1}/{LISTENERS_RETRY_ATTEMPTS}, waiting {LISTENERS_RETRY_DELAY}s...", flush=True)
-            time.sleep(LISTENERS_RETRY_DELAY)
-    print(f"{now_log()}[FUNRADIO] Waiting for next song...", flush=True)
-    return None
+        song_signature = extract_song_signature(song_data)
+        if song_signature != last_signature:
+            current_song_session_id = str(uuid.uuid4())
+            song_data['song_session_id'] = current_song_session_id
+            print(f"{now_log()}[FUNRADIO] New song, signature: {song_signature}, session_id: {current_song_session_id}", flush=True)
+            # Tu prípadne uložiť song_data
+
+        last_signature = song_signature
+
+        # Režim zberu listeners opakovane, kým sa song nezmení
+        while True:
+            listeners_data = fetch_listeners_once()
+            if listeners_data:
+                listeners_data['song_session_id'] = current_song_session_id
+                print(f"{now_log()}[FUNRADIO] Listeners: {listeners_data.get('listeners')} for song_session_id: {current_song_session_id}", flush=True)
+                # Tu prípadne uložiť listeners_data
+
+            time.sleep(LISTENERS_INTERVAL)
+
+            new_song_data = fetch_current_song()
+            if not new_song_data or extract_song_signature(new_song_data) != song_signature:
+                break
+
+if __name__ == "__main__":
+    main_loop()
