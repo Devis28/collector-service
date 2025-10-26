@@ -20,7 +20,7 @@ def fetch_current_song():
         response = requests.get(SONG_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
+            data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
             data['song_session_id'] = str(uuid.uuid4())
             # Nezávisle na štruktúre vždy zapisuj všetok raw
             print(f"{now_log()}[MELODY] NOW-PLAYING RAW: {json.dumps(data, ensure_ascii=False)}", flush=True)
@@ -47,7 +47,7 @@ def fetch_listeners_once():
         data = ws.recv()
         ws.close()
         listeners_data = json.loads(data)
-        listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
+        listeners_data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
         # Aj tu zapisuj raw nezávisle od štruktúry
         print(f"{now_log()}[MELODY] LISTENERS RAW: {json.dumps(listeners_data, ensure_ascii=False)}", flush=True)
         return listeners_data

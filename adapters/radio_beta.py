@@ -29,7 +29,7 @@ def fetch_current_song():
         response = requests.get(SONG_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
+            data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
             data['song_session_id'] = str(uuid.uuid4())
             # Meta-informácia o validite podľa pôvodného očakávania (môžeš meniť podľa logickej potreby)
             data['raw_valid'] = ('title' in data and 'interpreters' in data and 'start_time' in data)
@@ -44,7 +44,7 @@ def fetch_listeners_once():
         data = ws.recv()
         ws.close()
         listeners_data = json.loads(data)
-        listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
+        listeners_data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
         # Meta-informácia podľa očakávaného formátu
         listeners_data['raw_valid'] = ('listeners' in listeners_data and isinstance(listeners_data['listeners'], int))
         return listeners_data

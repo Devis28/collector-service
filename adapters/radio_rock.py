@@ -20,7 +20,7 @@ def fetch_current_song():
         response = requests.get(SONG_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
+            data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
             data['song_session_id'] = str(uuid.uuid4())
             # Meta pre validitu podľa starej štruktúry (voliteľné)
             data['raw_valid'] = (
@@ -41,7 +41,7 @@ def fetch_listeners_once():
         data = ws.recv()
         ws.close()
         listeners_data = json.loads(data)
-        listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
+        listeners_data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
         # Meta pre validitu podľa starej štruktúry (voliteľné)
         listeners_data['raw_valid'] = ('listeners' in listeners_data and isinstance(listeners_data['listeners'], int))
         print(f"{now_log()}[ROCK] RAW LISTENERS DATA: {json.dumps(listeners_data, ensure_ascii=False)}", flush=True)
