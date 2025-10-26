@@ -65,8 +65,14 @@ def process_and_log_song(last_signature):
     song_data = fetch_current_song()
     if not song_data:
         return None, last_signature
-    # Song sa uloží vždy!
-    return song_data, extract_song_signature(song_data)
+    song_signature = extract_song_signature(song_data)
+    # Uloží len ak sa zmenila signature (nový song podľa autor|názov|čas)
+    if song_signature and song_signature != last_signature:
+        print(f"{now_log()}[FUNRADIO] Song session: {song_data.get('song_session_id', None)}, signature: {song_signature}", flush=True)
+        return song_data, song_signature
+    print(f"{now_log()}[FUNRADIO] SAME song, skip save: {song_signature}", flush=True)
+    return None, last_signature
+
 
 def process_and_log_listeners(song_signature):
     print(f"{now_log()}[FUNRADIO] Waiting {LISTENERS_DELAY}s before fetching listeners...", flush=True)

@@ -56,13 +56,14 @@ def process_and_log_song(last_signature):
     song_data = fetch_current_song()
     if not song_data:
         return None, last_signature
-    # Pracuj s každým záznamom, aj keď nie je 'valid'
-    print(f"{now_log()}[BETA] Song data raw: {json.dumps(song_data, ensure_ascii=False)}", flush=True)
     song_signature = extract_song_signature(song_data)
-    if song_signature != last_signature:
+    # Záznam zapíš iba AK sa signature zmenilo (nový song v éteri)
+    if song_signature and song_signature != last_signature:
         print(f"{now_log()}[BETA] Song session: {song_data.get('song_session_id', None)}, signature: {song_signature}", flush=True)
         return song_data, song_signature
-    return song_data, last_signature  # stále appendni aj opakovaný záznam (ak chceš všetko!)
+    print(f"{now_log()}[BETA] SAME song, skip save: {song_signature}", flush=True)
+    return None, last_signature
+
 
 def process_and_log_listeners(song_signature):
     print(f"{now_log()}[BETA] Waiting {LISTENERS_DELAY}s before fetching listeners...", flush=True)

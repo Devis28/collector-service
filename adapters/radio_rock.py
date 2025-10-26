@@ -65,8 +65,15 @@ def process_and_log_song(last_signature):
     song_data = fetch_current_song()
     if not song_data:
         return None, last_signature
-    # Vždy zapíš každý song_data JSON!
-    return song_data, extract_song_signature(song_data)
+    song_signature = extract_song_signature(song_data)
+    # Zapíš len, keď sa zmenil signature (nový song)
+    if song_signature and song_signature != last_signature:
+        print(f"{now_log()}[ROCK] Song recorded: {song_signature}", flush=True)
+        return song_data, song_signature
+    # Výpis pre nezmenený song (debug/logovanie, nemusíš ukladať duplikát)
+    print(f"{now_log()}[ROCK] SAME song, skip save: {song_signature}", flush=True)
+    return None, last_signature
+
 
 def process_and_log_listeners(song_signature):
     print(f"{now_log()}[ROCK] Waiting {LISTENERS_DELAY}s before fetching listeners...", flush=True)
