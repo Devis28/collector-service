@@ -40,3 +40,6 @@ Thumbs.db
 # Railway a Docker
 .Dockerfile
 .start.sh
+
+# download records
+downloads_records/
