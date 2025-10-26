@@ -22,12 +22,7 @@ def fetch_current_song():
             data = response.json()
             data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
             data['song_session_id'] = str(uuid.uuid4())
-            # Defenzívna kontrola atribútov, fallbacky podľa typu API
-            song = data.get('song', data)
-            author = song.get('musicAuthor') or song.get('author') or song.get('interprets') or ''
-            title = song.get('musicTitle') or song.get('title') or song.get('song') or ''
-            start_time = song.get('startTime') or song.get('start_time') or song.get('start') or ''
-            data['raw_valid'] = bool(author and title and start_time)
+            # Nezávisle na štruktúre vždy zapisuj všetok raw
             print(f"{now_log()}[MELODY] NOW-PLAYING RAW: {json.dumps(data, ensure_ascii=False)}", flush=True)
             return data
     except Exception as e:
@@ -35,12 +30,15 @@ def fetch_current_song():
     return None
 
 def extract_song_signature(song_data):
-    song = song_data.get('song', song_data)
-    author = song.get('musicAuthor') or song.get('author') or song.get('interprets') or ''
-    title = song.get('musicTitle') or song.get('title') or song.get('song') or ''
-    start_time = song.get('startTime') or song.get('start_time') or song.get('start') or ''
-    if author and title and start_time:
-        return f"{author}|{title}|{start_time}"
+    # Robustné hľadanie aj ak štruktúra bude iná
+    author = song_data.get('artist') or song_data.get('musicAuthor') or song_data.get('author') or song_data.get('interprets') or ''
+    title = song_data.get('title') or song_data.get('musicTitle') or song_data.get('song') or ''
+    # Pre signature použijeme čas - v Melody je 'time' + 'date'
+    song_time = song_data.get('time', '')
+    song_date = song_data.get('date', '')
+    # Vytvor signature, ktorá je unikátna v rámci dňa
+    if author and title and song_time and song_date:
+        return f"{author}|{title}|{song_date} {song_time}"
     return ""
 
 def fetch_listeners_once():
@@ -50,7 +48,7 @@ def fetch_listeners_once():
         ws.close()
         listeners_data = json.loads(data)
         listeners_data['recorded_at'] = datetime.utcnow().isoformat() + 'Z'
-        listeners_data['raw_valid'] = ('listeners' in listeners_data and isinstance(listeners_data['listeners'], int))
+        # Aj tu zapisuj raw nezávisle od štruktúry
         print(f"{now_log()}[MELODY] LISTENERS RAW: {json.dumps(listeners_data, ensure_ascii=False)}", flush=True)
         return listeners_data
     except Exception as e:
@@ -62,7 +60,7 @@ def process_and_log_song(last_signature):
     if not song_data:
         return None, last_signature
     song_signature = extract_song_signature(song_data)
-    # Uloží len ak je signature nový a neprázdny
+    # Uloží len ak je signature nový a neprázdny nebude nič
     if song_signature and song_signature != last_signature:
         print(f"{now_log()}[MELODY] Song session: {song_data.get('song_session_id', None)}, signature: {song_signature}", flush=True)
         return song_data, song_signature
