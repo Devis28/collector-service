@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 from adapters import radio_rock, radio_beta, radio_funradio, radio_melody, radio_expres
 from writer import save_data_to_r2
 
-SEND_INTERVAL = 7200      # interval pre upload (v sekundách)
-SONG_CHECK_INTERVAL = 30  # defaultný interval listeners ak nie je špecifikovaný
+SEND_INTERVAL = 600      # interval pre upload
+SONG_CHECK_INTERVAL = 30  # interval listeners v sekundách
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -20,9 +20,8 @@ def run_radio(cfg):
     }
     t0 = time.time()
     radio = cfg["module"]
-    interval = cfg.get("interval", SONG_CHECK_INTERVAL)
-
     print(f"{now_log()}[THREAD] Starting {cfg['label']}", flush=True)
+
     while True:
         try:
             # Nová skladba
@@ -33,7 +32,6 @@ def run_radio(cfg):
                 state["records"].append(song_data)
                 print(f"{now_log()}[{cfg['label']}] New song: {song_signature}, session_id: {state['last_song_session_id']}", flush=True)
 
-            # Listeners cyklus (pre všetky rádiá)
             if state["last_song_session_id"]:
                 listeners_data = radio.process_and_log_listeners(song_signature=state["last_song_signature"])
                 if listeners_data:
@@ -42,7 +40,7 @@ def run_radio(cfg):
                     count = listeners_data.get('listeners', 'Unknown')
                     print(f"{now_log()}[{cfg['label']}] Listeners: {count}", flush=True)
 
-            # Upload batchu po SEND_INTERVAL
+            # Upload batchu
             if time.time() - t0 >= SEND_INTERVAL:
                 if state["records"]:
                     print(f"{now_log()}[WRITER] Saving {len(state['records'])} songs for {cfg['label']}", flush=True)
@@ -54,53 +52,45 @@ def run_radio(cfg):
                     state["listeners_records"] = []
                 t0 = time.time()
 
-            time.sleep(interval)
+            time.sleep(SONG_CHECK_INTERVAL)
 
         except Exception as e:
             print(f"{now_log()}[{cfg['label']}] ERROR: {e}", flush=True)
             time.sleep(10)
 
 def main():
-    print(f"{now_log()}[APP] Starting Expres Flask webhook server...", flush=True)
-    radio_expres.start_background_flask()
-    time.sleep(3)
-
     configs = [
         {
             "module": radio_rock,
             "song_prefix": "bronze/rock/song",
             "listeners_prefix": "bronze/rock/listeners",
-            "label": "ROCK",
-            "interval": 30,
+            "label": "ROCK"
         },
         {
             "module": radio_beta,
             "song_prefix": "bronze/beta/song",
             "listeners_prefix": "bronze/beta/listeners",
-            "label": "BETA",
-            "interval": 60,  # 3 minúty (zvýšené pre BETA)
+            "label": "BETA"
         },
         {
             "module": radio_funradio,
             "song_prefix": "bronze/funradio/song",
             "listeners_prefix": "bronze/funradio/listeners",
-            "label": "FUNRADIO",
-            "interval": 30,
+            "label": "FUNRADIO"
         },
         {
             "module": radio_melody,
             "song_prefix": "bronze/melody/song",
             "listeners_prefix": "bronze/melody/listeners",
-            "label": "MELODY",
-            "interval": 30,
+            "label": "MELODY"
         },
         {
             "module": radio_expres,
             "song_prefix": "bronze/expres/song",
             "listeners_prefix": "bronze/expres/listeners",
-            "label": "EXPRES",
-            "interval": 30,
+            "label": "EXPRES"
         }
+
     ]
 
     threads = []
@@ -109,7 +99,8 @@ def main():
         t.start()
         threads.append(t)
 
-    print(f"{now_log()}[APP] All radio threads started. Expres webhook: http://68.183.213.156:8000/expres_webhook", flush=True)
+    print(f"{now_log()}[APP] All radio threads started.", flush=True)
+
     while True:
         time.sleep(60)
 
