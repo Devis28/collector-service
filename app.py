@@ -5,13 +5,11 @@ from zoneinfo import ZoneInfo
 from adapters import radio_rock, radio_beta, radio_funradio, radio_melody, radio_expres
 from writer import save_data_to_r2
 
-SEND_INTERVAL = 7200  # interval pre upload
-SONG_CHECK_INTERVAL = 30  # presný interval listeners v sekundách
-
+SEND_INTERVAL = 7200      # interval pre upload
+SONG_CHECK_INTERVAL = 30  # interval listeners v sekundách
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
-
 
 def run_radio(cfg):
     state = {
@@ -26,18 +24,16 @@ def run_radio(cfg):
 
     while True:
         try:
-            # Zisti novú skladbu
+            # Nová skladba
             song_data, song_signature = radio.process_and_log_song(state["last_song_signature"])
             if song_data:
                 state["last_song_signature"] = song_signature
                 state["last_song_session_id"] = song_data.get('song_session_id')
                 state["records"].append(song_data)
-                print(
-                    f"{now_log()}[{cfg['label']}] New song: {song_signature}, session_id: {state['last_song_session_id']}",
-                    flush=True)
+                print(f"{now_log()}[{cfg['label']}] New song: {song_signature}, session_id: {state['last_song_session_id']}", flush=True)
 
-            # VYPNUTÉ PRE EXPRES: Listeners sa nezískavajú pre Expres
-            if cfg["label"] != "EXPRES" and state["last_song_session_id"]:
+            # Listeners cyklus (pre všetky rádia vrátane Expres)
+            if state["last_song_session_id"]:
                 listeners_data = radio.process_and_log_listeners(song_signature=state["last_song_signature"])
                 if listeners_data:
                     listeners_data["song_session_id"] = state["last_song_session_id"]
@@ -52,8 +48,7 @@ def run_radio(cfg):
                     save_data_to_r2(state["records"], cfg["song_prefix"])
                     state["records"] = []
                 if state["listeners_records"]:
-                    print(f"{now_log()}[WRITER] Saving {len(state['listeners_records'])} listeners for {cfg['label']}",
-                          flush=True)
+                    print(f"{now_log()}[WRITER] Saving {len(state['listeners_records'])} listeners for {cfg['label']}", flush=True)
                     save_data_to_r2(state["listeners_records"], cfg["listeners_prefix"])
                     state["listeners_records"] = []
                 t0 = time.time()
@@ -64,13 +59,12 @@ def run_radio(cfg):
             print(f"{now_log()}[{cfg['label']}] ERROR: {e}", flush=True)
             time.sleep(10)
 
-
 def main():
-    # NAJPRV spusti Flask server pre Expres webhook
+    # Najprv spusti Flask server pre Expres webhook (nutné pre PUSH efekt)
     print(f"{now_log()}[APP] Starting Expres Flask webhook server...", flush=True)
     radio_expres.start_background_flask()
 
-    # Počkaj kým sa Flask server nastartuje
+    # Krátke čakanie, než Flask nabootuje
     time.sleep(3)
 
     configs = [
@@ -112,13 +106,10 @@ def main():
         t.start()
         threads.append(t)
 
-    print(f"{now_log()}[APP] All radio threads started. Expres webhook: http://68.183.213.156:8000/expres_webhook",
-          flush=True)
-    print(f"{now_log()}[APP] EXPRES LISTENERS DISABLED - API server unavailable", flush=True)
+    print(f"{now_log()}[APP] All radio threads started. Expres webhook: http://68.183.213.156:8000/expres_webhook", flush=True)
 
     while True:
         time.sleep(60)
-
 
 if __name__ == "__main__":
     main()
