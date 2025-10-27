@@ -59,6 +59,9 @@ def run_radio(cfg):
             time.sleep(10)
 
 def main():
+    radio_expres.start_background_flask()
+    time.sleep(3)
+
     configs = [
         {
             "module": radio_rock,
