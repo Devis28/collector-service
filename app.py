@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 from adapters import radio_rock, radio_beta, radio_funradio, radio_melody
 from writer import save_data_to_r2
 
-SEND_INTERVAL = 600           # interval pre upload (2 hod.)
-SONG_CHECK_INTERVAL = 30       # interval pre kontrolu skladby (30 sekúnd)
+SEND_INTERVAL = 600      # interval pre upload (10 minút pre testovanie)
+SONG_CHECK_INTERVAL = 3  # interval pre kontrolu skladby (3 sekundy, môžeš nastaviť 30)
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -22,17 +22,30 @@ def run_radio(cfg):
     radio = cfg["module"]
     print(f"{now_log()}[THREAD] Starting {cfg['label']}", flush=True)
     while True:
+        # Vždy skontroluj, či je nový song
         song_data, song_signature = radio.process_and_log_song(state["last_song_signature"])
         if song_data:
             state["last_song_signature"] = song_signature
             state["last_song_session_id"] = song_data.get('song_session_id')
             state["records"].append(song_data)
+            print(f"{now_log()}[{cfg['label']}] New song: {song_signature}, session_id: {state['last_song_session_id']}", flush=True)
 
-            listeners_data = radio.process_and_log_listeners(song_signature=song_signature)
-            if listeners_data:
-                listeners_data["song_session_id"] = state["last_song_session_id"]
-                state["listeners_records"].append(listeners_data)
+        # Ak už máme session_id, začni cyklus na listeners
+        if state["last_song_session_id"]:
+            while True:
+                listeners_data = radio.process_and_log_listeners(song_signature=state["last_song_signature"])
+                if listeners_data:
+                    listeners_data["song_session_id"] = state["last_song_session_id"]
+                    state["listeners_records"].append(listeners_data)
+                    print(f"{now_log()}[{cfg['label']}] Listeners: {listeners_data.get('listeners')} for session_id: {state['last_song_session_id']}", flush=True)
+                time.sleep(SONG_CHECK_INTERVAL)
 
+                # Skontroluj, či je stále rovnaká skladba
+                next_song_data, next_signature = radio.process_and_log_song(state["last_song_signature"])
+                if next_song_data or next_signature != state['last_song_signature']:
+                    break  # skladba sa zmenila, break a začni nový cyklus
+
+        # Každých SEND_INTERVAL flushni dáta
         if time.time() - t0 >= SEND_INTERVAL:
             if state["records"]:
                 print(f"{now_log()}[WRITER] Saving {len(state['records'])} song records for {cfg['label']} to {cfg['song_prefix']}", flush=True)
@@ -43,7 +56,6 @@ def run_radio(cfg):
                 save_data_to_r2(state["listeners_records"], cfg["listeners_prefix"])
                 state["listeners_records"] = []
             t0 = time.time()
-        time.sleep(SONG_CHECK_INTERVAL)
 
 def main():
     configs = [
@@ -79,7 +91,7 @@ def main():
         threads.append(t)
     print(f"{now_log()}[APP] All radio threads started...", flush=True)
     while True:
-        time.sleep(60)   # hlavný thread môže slúžiť na monitorovanie alebo jednoduchý watchdog
+        time.sleep(60)   # watchdog
 
 if __name__ == "__main__":
     main()

@@ -1,14 +1,12 @@
 import requests
 import websocket
 import json
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
 SONG_URL = "https://funradio-server.fly.dev/pull/playing"
 LISTENERS_WS_URL = "wss://funradio-server.fly.dev/ws/push/listenership"
-LISTENERS_INTERVAL = 30
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")

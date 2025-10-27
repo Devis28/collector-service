@@ -1,14 +1,12 @@
 import requests
 import websocket
 import json
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
 SONG_URL = "https://rock-server.fly.dev/pull/playing"
 LISTENERS_WS_URL = "wss://rock-server.fly.dev/ws/push/listenership"
-LISTENERS_INTERVAL = 30
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -24,7 +22,6 @@ def extract_song_signature(song_data):
     return ""
 
 def process_and_log_song(last_song_signature):
-    # Získa aktuálny song
     try:
         response = requests.get(SONG_URL, timeout=10)
         if response.status_code != 200:
@@ -40,8 +37,6 @@ def process_and_log_song(last_song_signature):
         song_signature = extract_song_signature(data)
         if not data['raw_valid'] or not song_signature:
             return None, last_song_signature
-
-        # Ak je nová skladba, vygeneruj nové session_id:
         if song_signature != last_song_signature:
             data['song_session_id'] = str(uuid.uuid4())
             return data, song_signature
@@ -51,7 +46,6 @@ def process_and_log_song(last_song_signature):
         return None, last_song_signature
 
 def process_and_log_listeners(song_signature=None):
-    # Listeners vždy po SONG_CHECK_INTERVAL
     try:
         ws = websocket.create_connection(LISTENERS_WS_URL, timeout=20)
         recv = ws.recv()

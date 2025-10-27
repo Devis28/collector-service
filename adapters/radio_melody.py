@@ -1,14 +1,12 @@
 import requests
 import websocket
 import json
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
 SONG_URL = "https://radio-melody-api.fly.dev/song"
 LISTENERS_WS_URL = "wss://radio-melody-api.fly.dev/ws/listeners"
-LISTENERS_INTERVAL = 30
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -29,7 +27,6 @@ def process_and_log_song(last_song_signature):
             return None, last_song_signature
         data = response.json()
         data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
-        # Pre budúce zmeny nechávaš vždy raw
         data['raw_valid'] = (
             ('title' in data or 'musicTitle' in data or 'song' in data) and
             ('artist' in data or 'musicAuthor' in data or 'interprets' in data) and
@@ -39,7 +36,6 @@ def process_and_log_song(last_song_signature):
         song_signature = extract_song_signature(data)
         if not data['raw_valid'] or not song_signature:
             return None, last_song_signature
-
         if song_signature != last_song_signature:
             data['song_session_id'] = str(uuid.uuid4())
             return data, song_signature
