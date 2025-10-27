@@ -36,8 +36,8 @@ def run_radio(cfg):
                     f"{now_log()}[{cfg['label']}] New song: {song_signature}, session_id: {state['last_song_session_id']}",
                     flush=True)
 
-            # Pre Expres: listeners sa získavajú nezávisle od songu
-            if cfg["label"] == "EXPRES" or state["last_song_session_id"]:
+            # VYPNUTÉ PRE EXPRES: Listeners sa nezískavajú pre Expres
+            if cfg["label"] != "EXPRES" and state["last_song_session_id"]:
                 listeners_data = radio.process_and_log_listeners(song_signature=state["last_song_signature"])
                 if listeners_data:
                     listeners_data["song_session_id"] = state["last_song_session_id"]
@@ -114,6 +114,7 @@ def main():
 
     print(f"{now_log()}[APP] All radio threads started. Expres webhook: http://68.183.213.156:8000/expres_webhook",
           flush=True)
+    print(f"{now_log()}[APP] EXPRES LISTENERS DISABLED - API server unavailable", flush=True)
 
     while True:
         time.sleep(60)
