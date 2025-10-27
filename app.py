@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 from adapters import radio_rock, radio_beta, radio_funradio, radio_melody, radio_expres
 from writer import save_data_to_r2
 
-SEND_INTERVAL = 7200      # interval pre upload
-SONG_CHECK_INTERVAL = 30  # interval listeners v sekundách
+SEND_INTERVAL = 7200      # interval pre upload (v sekundách)
+SONG_CHECK_INTERVAL = 30  # defaultný interval listeners ak nie je špecifikovaný
 
 def now_log():
     return datetime.now(ZoneInfo("Europe/Bratislava")).strftime("[%Y-%m-%d %H:%M:%S]")
@@ -20,8 +20,9 @@ def run_radio(cfg):
     }
     t0 = time.time()
     radio = cfg["module"]
-    print(f"{now_log()}[THREAD] Starting {cfg['label']}", flush=True)
+    interval = cfg.get("interval", SONG_CHECK_INTERVAL)
 
+    print(f"{now_log()}[THREAD] Starting {cfg['label']}", flush=True)
     while True:
         try:
             # Nová skladba
@@ -53,18 +54,15 @@ def run_radio(cfg):
                     state["listeners_records"] = []
                 t0 = time.time()
 
-            time.sleep(SONG_CHECK_INTERVAL)
+            time.sleep(interval)
 
         except Exception as e:
             print(f"{now_log()}[{cfg['label']}] ERROR: {e}", flush=True)
             time.sleep(10)
 
 def main():
-    # Najprv spusti Flask server pre Expres webhook
     print(f"{now_log()}[APP] Starting Expres Flask webhook server...", flush=True)
     radio_expres.start_background_flask()
-
-    # Krátke čakanie na štart Flasku
     time.sleep(3)
 
     configs = [
@@ -72,31 +70,36 @@ def main():
             "module": radio_rock,
             "song_prefix": "bronze/rock/song",
             "listeners_prefix": "bronze/rock/listeners",
-            "label": "ROCK"
+            "label": "ROCK",
+            "interval": 30,
         },
         {
             "module": radio_beta,
             "song_prefix": "bronze/beta/song",
             "listeners_prefix": "bronze/beta/listeners",
-            "label": "BETA"
+            "label": "BETA",
+            "interval": 40,  # 3 minúty (zvýšené pre BETA)
         },
         {
             "module": radio_funradio,
             "song_prefix": "bronze/funradio/song",
             "listeners_prefix": "bronze/funradio/listeners",
-            "label": "FUNRADIO"
+            "label": "FUNRADIO",
+            "interval": 30,
         },
         {
             "module": radio_melody,
             "song_prefix": "bronze/melody/song",
             "listeners_prefix": "bronze/melody/listeners",
-            "label": "MELODY"
+            "label": "MELODY",
+            "interval": 30,
         },
         {
             "module": radio_expres,
             "song_prefix": "bronze/expres/song",
             "listeners_prefix": "bronze/expres/listeners",
-            "label": "EXPRES"
+            "label": "EXPRES",
+            "interval": 30,
         }
     ]
 
@@ -107,7 +110,6 @@ def main():
         threads.append(t)
 
     print(f"{now_log()}[APP] All radio threads started. Expres webhook: http://68.183.213.156:8000/expres_webhook", flush=True)
-
     while True:
         time.sleep(60)
 
