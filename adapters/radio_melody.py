@@ -22,7 +22,7 @@ def extract_song_signature(song_data):
 
 def process_and_log_song(last_song_signature):
     try:
-        response = requests.get(SONG_URL, timeout=10)
+        response = requests.get(SONG_URL, timeout=20)
         if response.status_code != 200:
             return None, last_song_signature
         data = response.json()
