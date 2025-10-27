@@ -2,7 +2,7 @@ import time
 import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from adapters import radio_rock, radio_beta, radio_funradio, radio_melody
+from adapters import radio_rock, radio_beta, radio_funradio, radio_melody, radio_expres
 from writer import save_data_to_r2
 
 SEND_INTERVAL = 7200      # interval pre upload
@@ -89,8 +89,13 @@ def main():
             "song_prefix": "bronze/melody/song",
             "listeners_prefix": "bronze/melody/listeners",
             "label": "MELODY"
-        }
-    ]
+        },
+        {
+            "module": radio_expres,
+            "song_prefix": "bronze/expres/song",
+            "listeners_prefix": "bronze/expres/listeners",
+            "label": "EXPRES"
+        }    ]
     threads = []
     for cfg in configs:
         t = threading.Thread(target=run_radio, args=(cfg,), daemon=True)
