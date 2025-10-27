@@ -27,7 +27,6 @@ def fetch_current_song():
         if response.status_code == 200:
             data = response.json()
             data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
-            # song_session_id bude pridané až v hlavnej slučke
             data['raw_valid'] = ('title' in data and 'interpreters' in data and 'start_time' in data)
             return data
     except Exception as e:
@@ -47,58 +46,39 @@ def fetch_listeners_once():
         print(f"{now_log()}[BETA] Error fetching listeners: {e}", flush=True)
     return None
 
-def process_and_log_song(last_song_signature):
-    song_data = fetch_current_song()
-    if not song_data:
-        return None, last_song_signature
-    song_signature = extract_song_signature(song_data)
-    song_data['song_session_id'] = None
-    if song_signature != last_song_signature:
-        song_data['song_session_id'] = str(uuid.uuid4())
-        print(f"{now_log()}[BETA] New song, signature: {song_signature}, session_id: {song_data['song_session_id']}", flush=True)
-        # Tu môže byť logika uloženia, ak treba
-    return song_data, song_signature
-
-def process_and_log_listeners(song_signature=None):
-    listeners_data = fetch_listeners_once()
-    # Tu môžeš vkladať ďalšiu logiku, napr. priradenie song_session_id podľa potreby...
-    return listeners_data
-
-
 def main_loop():
-    last_signature = ""
+    last_signature = None
     current_song_session_id = None
 
     while True:
         song_data = fetch_current_song()
-        if not song_data:
+        if not song_data or not song_data['raw_valid']:
             time.sleep(5)
             continue
 
         song_signature = extract_song_signature(song_data)
-        # Nový song = nové session_id
-        if song_signature != last_signature:
+        if song_signature != last_signature and song_signature:
             current_song_session_id = str(uuid.uuid4())
             song_data['song_session_id'] = current_song_session_id
-            print(f"{now_log()}[BETA] New song, signature: {song_signature}, session_id: {current_song_session_id}", flush=True)
+            print(f"{now_log()}[BETA] NEW SONG: {json.dumps(song_data, ensure_ascii=False)}, session_id: {current_song_session_id}", flush=True)
             # Tu prípadne uložiť song_data
+            last_signature = song_signature
 
-        last_signature = song_signature
+        if current_song_session_id:
+            while True:
+                listeners_data = fetch_listeners_once()
+                if listeners_data and listeners_data['raw_valid']:
+                    listeners_data['song_session_id'] = current_song_session_id
+                    print(f"{now_log()}[BETA] LISTENERS: {json.dumps(listeners_data, ensure_ascii=False)}, session_id: {current_song_session_id}", flush=True)
+                    # Tu prípadne uložiť listeners_data
 
-        # Režim zberu listeners opakovane, kým sa song nezmení
-        while True:
-            listeners_data = fetch_listeners_once()
-            if listeners_data:
-                listeners_data['song_session_id'] = current_song_session_id
-                print(f"{now_log()}[BETA] Listeners: {listeners_data.get('listeners')} for song_session_id: {current_song_session_id}", flush=True)
-                # Tu prípadne uložiť listeners_data
-
-            time.sleep(LISTENERS_INTERVAL)
-
-            # Skontroluj, či je stále rovnaký song. Ak nie, break.
-            new_song_data = fetch_current_song()
-            if not new_song_data or extract_song_signature(new_song_data) != song_signature:
-                break
+                time.sleep(LISTENERS_INTERVAL)
+                new_song_data = fetch_current_song()
+                if not new_song_data or not new_song_data['raw_valid']:
+                    break
+                new_signature = extract_song_signature(new_song_data)
+                if new_signature != last_signature and new_signature:
+                    break
 
 if __name__ == "__main__":
     main_loop()
