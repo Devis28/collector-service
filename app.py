@@ -32,7 +32,7 @@ def run_radio(cfg):
                 state["records"].append(song_data)
                 print(f"{now_log()}[{cfg['label']}] New song: {song_signature}, session_id: {state['last_song_session_id']}", flush=True)
 
-            # Listeners cyklus (pre všetky rádia vrátane Expres)
+            # Listeners cyklus (pre všetky rádiá)
             if state["last_song_session_id"]:
                 listeners_data = radio.process_and_log_listeners(song_signature=state["last_song_signature"])
                 if listeners_data:
@@ -41,7 +41,7 @@ def run_radio(cfg):
                     count = listeners_data.get('listeners', 'Unknown')
                     print(f"{now_log()}[{cfg['label']}] Listeners: {count}", flush=True)
 
-            # Upload batchu
+            # Upload batchu po SEND_INTERVAL
             if time.time() - t0 >= SEND_INTERVAL:
                 if state["records"]:
                     print(f"{now_log()}[WRITER] Saving {len(state['records'])} songs for {cfg['label']}", flush=True)
@@ -60,11 +60,11 @@ def run_radio(cfg):
             time.sleep(10)
 
 def main():
-    # Najprv spusti Flask server pre Expres webhook (nutné pre PUSH efekt)
+    # Najprv spusti Flask server pre Expres webhook
     print(f"{now_log()}[APP] Starting Expres Flask webhook server...", flush=True)
     radio_expres.start_background_flask()
 
-    # Krátke čakanie, než Flask nabootuje
+    # Krátke čakanie na štart Flasku
     time.sleep(3)
 
     configs = [
