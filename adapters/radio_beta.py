@@ -21,64 +21,39 @@ def extract_song_signature(song_data):
         return f"{interpreters}|{title}|{start_time}"
     return ""
 
-def fetch_current_song():
+def process_and_log_song(last_song_signature):
     try:
         response = requests.get(SONG_URL, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
-            data['raw_valid'] = ('title' in data and 'interpreters' in data and 'start_time' in data)
-            return data
+        if response.status_code != 200:
+            return None, last_song_signature
+        data = response.json()
+        data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
+        data['raw_valid'] = (
+            ('title' in data or 'song' in data) and
+            ('interpreters' in data or 'artist' in data) and
+            ('start_time' in data or 'start' in data)
+        )
+        song_signature = extract_song_signature(data)
+        if not data['raw_valid'] or not song_signature:
+            return None, last_song_signature
+
+        if song_signature != last_song_signature:
+            data['song_session_id'] = str(uuid.uuid4())
+            return data, song_signature
+        return None, last_song_signature
     except Exception as e:
         print(f"{now_log()}[BETA] Error fetching song: {e}", flush=True)
-    return None
+        return None, last_song_signature
 
-def fetch_listeners_once():
+def process_and_log_listeners(song_signature=None):
     try:
         ws = websocket.create_connection(LISTENERS_WS_URL, timeout=20)
-        data = ws.recv()
+        recv = ws.recv()
         ws.close()
-        listeners_data = json.loads(data)
+        listeners_data = json.loads(recv)
         listeners_data['recorded_at'] = datetime.now(ZoneInfo("Europe/Bratislava")).isoformat()
         listeners_data['raw_valid'] = ('listeners' in listeners_data and isinstance(listeners_data['listeners'], int))
-        return listeners_data
+        return listeners_data if listeners_data['raw_valid'] else None
     except Exception as e:
         print(f"{now_log()}[BETA] Error fetching listeners: {e}", flush=True)
-    return None
-
-def main_loop():
-    last_signature = None
-    current_song_session_id = None
-
-    while True:
-        song_data = fetch_current_song()
-        if not song_data or not song_data['raw_valid']:
-            time.sleep(5)
-            continue
-
-        song_signature = extract_song_signature(song_data)
-        if song_signature != last_signature and song_signature:
-            current_song_session_id = str(uuid.uuid4())
-            song_data['song_session_id'] = current_song_session_id
-            print(f"{now_log()}[BETA] NEW SONG: {json.dumps(song_data, ensure_ascii=False)}, session_id: {current_song_session_id}", flush=True)
-            # Tu prípadne uložiť song_data
-            last_signature = song_signature
-
-        if current_song_session_id:
-            while True:
-                listeners_data = fetch_listeners_once()
-                if listeners_data and listeners_data['raw_valid']:
-                    listeners_data['song_session_id'] = current_song_session_id
-                    print(f"{now_log()}[BETA] LISTENERS: {json.dumps(listeners_data, ensure_ascii=False)}, session_id: {current_song_session_id}", flush=True)
-                    # Tu prípadne uložiť listeners_data
-
-                time.sleep(LISTENERS_INTERVAL)
-                new_song_data = fetch_current_song()
-                if not new_song_data or not new_song_data['raw_valid']:
-                    break
-                new_signature = extract_song_signature(new_song_data)
-                if new_signature != last_signature and new_signature:
-                    break
-
-if __name__ == "__main__":
-    main_loop()
+        return None
