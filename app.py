@@ -37,7 +37,7 @@ def run_radio(cfg):
                     flush=True)
 
             # VYPNUTÉ PRE EXPRES: Listeners sa nezískavajú pre Expres
-            if cfg["label"] != "EXPRES" and state["last_song_session_id"]:
+            if cfg["label"] == "EXPRES" and state["last_song_session_id"]:
                 listeners_data = radio.process_and_log_listeners(song_signature=state["last_song_signature"])
                 if listeners_data:
                     listeners_data["song_session_id"] = state["last_song_session_id"]
