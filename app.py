@@ -78,7 +78,7 @@ def main():
             "song_prefix": "bronze/beta/song",
             "listeners_prefix": "bronze/beta/listeners",
             "label": "BETA",
-            "interval": 40,  # 3 minúty (zvýšené pre BETA)
+            "interval": 60,  # 3 minúty (zvýšené pre BETA)
         },
         {
             "module": radio_funradio,
