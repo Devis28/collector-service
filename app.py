@@ -67,7 +67,7 @@ def run_radio(cfg):
 
 def main():
     # NAJPRV spusti Flask server pre Expres webhook
-    print(f"{now_log()}[APP] Starting Express Flask webhook server...", flush=True)
+    print(f"{now_log()}[APP] Starting Expres Flask webhook server...", flush=True)
     radio_expres.start_background_flask()
 
     # Počkaj kým sa Flask server nastartuje
@@ -112,7 +112,7 @@ def main():
         t.start()
         threads.append(t)
 
-    print(f"{now_log()}[APP] All radio threads started. Express webhook: http://68.183.213.156:8000/expres_webhook",
+    print(f"{now_log()}[APP] All radio threads started. Expres webhook: http://68.183.213.156:8000/expres_webhook",
           flush=True)
 
     while True:
