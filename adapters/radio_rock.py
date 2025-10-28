@@ -6,7 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-SONG_API = "https://rock-server.fly.dev/pull/playing"
+SONG_API = "https://rock-server.fly.dev/pullplaying"
 LISTENERS_WS = "wss://rock-server.fly.dev/ws/push/listenership"
 
 def log_radio_event(radio_name, text, session_id=None):
@@ -28,7 +28,7 @@ def get_current_song():
         )
         session_id = str(uuid.uuid4())
         return {
-            **data,  # rozbalí last_update + song dict
+            **data,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": raw_valid,
             "song_session_id": session_id
@@ -40,25 +40,32 @@ def get_current_song():
             "song_session_id": str(uuid.uuid4())
         }
 
-async def get_current_listeners(session_id):
+async def get_current_listeners(session_id=None):
     listeners_data = None
-    session = await websockets.connect(LISTENERS_WS)
-    try:
-        msg = await asyncio.wait_for(session.recv(), timeout=10)
-        data = json.loads(msg)
-        raw_valid = "listeners" in data and "last_update" in data
-        listeners_data = {
-            **data,
-            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": raw_valid,
-            "song_session_id": session_id
-        }
-    except Exception as e:
-        listeners_data = {
-            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": False,
-            "song_session_id": session_id
-        }
-    finally:
-        await session.close()
+    uri = LISTENERS_WS
+    async with websockets.connect(uri) as websocket:
+        while True:
+            try:
+                msg = await asyncio.wait_for(websocket.recv(), timeout=10)
+                data = json.loads(msg)
+                msg_type = data.get('type', 'unknown')
+
+                if msg_type == 'listeners_update':
+                    # Rozbalenie údajov z listeners_update správy
+                    raw_valid = "listeners" in data and "last_update" in data
+                    listeners_data = {
+                        "listeners": data.get("listeners"),
+                        "last_update": data.get("last_update"),
+                        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                        "raw_valid": raw_valid,
+                        "song_session_id": session_id
+                    }
+                    break  # zachytí len prvý listeners_update, ukončí
+            except Exception as e:
+                listeners_data = {
+                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                    "raw_valid": False,
+                    "song_session_id": session_id
+                }
+                break
     return listeners_data
