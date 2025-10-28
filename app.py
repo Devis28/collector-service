@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from adapters.radio_melody import get_current_song, get_current_listeners, log_radio_event
 from writer import upload_file
+import uuid
 
 INTERVAL = 30
 BATCH_TIME = 600
