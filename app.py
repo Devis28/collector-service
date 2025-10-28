@@ -25,14 +25,9 @@ def main():
             song_session_id = song_data.get("song_session_id")
             song_dt = datetime.fromisoformat(song_data["recorded_at"])
             upload_bronze_station(
-                BUCKET,
-                data_type="song",
-                station=STATION,
-                timestamp=song_dt,
-                json_data=song_data
+                BUCKET, "song", STATION, timestamp=song_dt, json_data=song_data
             )
-
-            # Okamžite listeners po songu
+            # Prvý batch po songu
             listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=0.5))
             for l in listeners or []:
                 listen_dt = datetime.fromisoformat(l["recorded_at"])
@@ -40,7 +35,7 @@ def main():
                     BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                 )
 
-            # Neustály cyklus - listeners každých 30s, pokým sa skladba nezmení
+            # Hlavná listeners slučka cez interval
             while True:
                 listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=30))
                 for l in listeners or []:
@@ -48,14 +43,15 @@ def main():
                     upload_bronze_station(
                         BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                     )
+                # Čo robí tvoj expres: pri None to vôbec neláme cyklus!
                 current_song = radio_melody.fetch_song()
-                # Cyklus končí len ak API vráti nový title. Pri None cyklus pokračuje!
-                if (current_song is not None) and (current_song["title"] != last_title):
+                if current_song is not None and current_song["title"] != last_title:
                     break
+                # Ak je current_song None, pokojne pokračujeme - o ďalších 30s znova roztočíme fetch
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f'[FATAL ERROR] : {e}')
-        time.sleep(5)
+        print(f'[FATAL ERROR]: {e}')
+        time.sleep(10)
