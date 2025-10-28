@@ -1,55 +1,61 @@
-import requests
 import asyncio
-import websockets
-import datetime
-import uuid
-import json
-import zoneinfo
 import time
+import json
+import os
+from adapters import radio_melody
+from writer import upload_to_r2
+from dotenv import load_dotenv
 
-SONG_API = "https://radio-melody-api.fly.dev/song"
-LISTENERS_WS = "wss://radio-melody-api.fly.dev/ws/listeners"
-TZI = zoneinfo.ZoneInfo("Europe/Bratislava")
+load_dotenv()
 
-def now_bratislava():
-    return datetime.datetime.now(TZI).strftime("%d.%m.%Y %H:%M:%S")
+BUCKET = os.getenv("R2_BUCKET")
+LOCAL_PATH = "/tmp/radiomelody/"
 
-seen_song_titles = set()
+os.makedirs(LOCAL_PATH, exist_ok=True)
 
-def fetch_song():
-    response = requests.get(SONG_API)
-    data = response.json()
-    required = ["station", "title", "artist", "date", "time", "last_update"]
-    raw_valid = all(data.get(col) for col in required)
-    data["recorded_at"] = datetime.datetime.now().isoformat()
-    data["raw_valid"] = raw_valid
-    data["song_session_id"] = str(uuid.uuid4())
+def save_locally(identifier, suffix, data):
+    with open(f"{LOCAL_PATH}{identifier}_{suffix}.json", "a") as f:
+        f.write(json.dumps(data) + "\n")
 
-    song_key = f"{data.get('artist', '?')}–{data.get('title', '?')}"
-    if song_key not in seen_song_titles:
-        seen_song_titles.add(song_key)
-        return data
-    return None
+def main():
+    last_title = None
+    file_buffer = []
+    upload_interval = 10 * 60  # 10 min v sekundách
+    last_upload = time.time()
 
-async def collect_listeners(song_session_id, interval=30):
-    start_time = time.time()
-    listener_record = None
-    async with websockets.connect(LISTENERS_WS) as ws:
-        while True:
-            elapsed = time.time() - start_time
-            if elapsed >= interval:
-                break
-            try:
-                timeout = interval - elapsed if interval - elapsed > 0 else 1
-                message = await asyncio.wait_for(ws.recv(), timeout=timeout)
-                info = json.loads(message)
-                required = ["listeners", "last_update"]
-                raw_valid = all(info.get(col) for col in required)
-                info["recorded_at"] = datetime.datetime.now().isoformat()
-                info["raw_valid"] = raw_valid
-                info["song_session_id"] = song_session_id
-                if not listener_record:
-                    listener_record = info
-            except asyncio.TimeoutError:
-                break
-    return [listener_record] if listener_record else []
+    while True:
+        song_data = radio_melody.fetch_song()
+        if song_data is None:
+            time.sleep(5)
+            continue
+
+        # Nová skladba začína nový session, listener records buffer
+        if last_title != song_data["title"]:
+            last_title = song_data["title"]
+            song_session_id = song_data["song_session_id"]
+            save_locally(song_session_id, "song", song_data)
+            listeners_records = []
+
+            # Zaznamenávaj listeners každých 30 sekúnd, kým sa nezmení song
+            while True:
+                current_song = radio_melody.fetch_song()
+                if current_song is not None and current_song["title"] != last_title:
+                    break
+                listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=30))
+                listeners_records.extend(listeners)
+                for l in listeners:
+                    save_locally(song_session_id, "listeners", l)
+                time.sleep(1)
+
+            file_buffer.append((song_session_id, song_data, listeners_records))
+
+        now = time.time()
+        if now - last_upload >= upload_interval and file_buffer:
+            for sid, song, listeners in file_buffer:
+                upload_to_r2(BUCKET, f"songs/{sid}_song.json", json.dumps(song))
+                upload_to_r2(BUCKET, f"listeners/{sid}_listeners.json", json.dumps(listeners))
+            file_buffer = []
+            last_upload = now
+
+if __name__ == "__main__":
+    main()
