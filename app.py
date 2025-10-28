@@ -21,7 +21,7 @@ def main():
 
     previous_title = None
     previous_artist = None
-    current_session_id = None
+    session_id = None
 
     while True:
         current_song = get_current_song()
@@ -30,15 +30,18 @@ def main():
 
         # Song sa zapíše IBA ak je iný title alebo artist
         if title != previous_title or artist != previous_artist:
-            current_session_id = current_song["song_session_id"]
+            session_id = str(uuid.uuid4())  # VYGENERUJ IBA PRI ZMENE
             previous_title = title
             previous_artist = artist
+            # DOPLŇ song_session_id do objektu
+            current_song["song_session_id"] = session_id
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
             song_data_batch.append(current_song)
 
-        # Listeners zapisuj každý interval k aktuálnemu session_id
+        # Listeners zapisuj vždy k aktuálnemu session_id, nevolaj get_current_song znova!
         listeners_data = asyncio.run(get_current_listeners())
-        listeners_data["song_session_id"] = current_session_id
-        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", current_session_id)
+        listeners_data["song_session_id"] = session_id
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", session_id)
         listeners_data_batch.append(listeners_data)
 
         # Upload každých 10 minút
@@ -62,6 +65,7 @@ def main():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
+
 
 if __name__ == "__main__":
     main()
