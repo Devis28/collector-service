@@ -10,12 +10,6 @@ INTERVAL = 30
 BATCH_TIME = 600
 RADIO_NAME = "melody"
 
-def is_song_changed(song_a, song_b):
-    if not song_b:
-        return True
-    return (song_a["data"].get("title") != song_b["data"].get("title") or
-            song_a["data"].get("artist") != song_b["data"].get("artist"))
-
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -25,25 +19,29 @@ def main():
     song_data_batch = []
     listeners_data_batch = []
 
-    previous_song = None
+    previous_title = None
+    previous_artist = None
     current_session_id = None
 
     while True:
         current_song = get_current_song()
+        title = current_song["data"].get("title")
+        artist = current_song["data"].get("artist")
 
-        # Song zapíš LEN ak sa zmenil title alebo artist
-        if is_song_changed(current_song, previous_song):
+        # Song sa zapíše IBA ak je iný title alebo artist
+        if title != previous_title or artist != previous_artist:
             current_session_id = current_song["song_session_id"]
-            previous_song = current_song
+            previous_title = title
+            previous_artist = artist
             song_data_batch.append(current_song)
 
-        # Listeners zapisuj vždy k session_id aktuálnej skladby
+        # Listeners zapisuj každý interval k aktuálnemu session_id
         listeners_data = asyncio.run(get_current_listeners())
         listeners_data["song_session_id"] = current_session_id
         log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", current_session_id)
         listeners_data_batch.append(listeners_data)
 
-        # Ukladanie každých 10 minút
+        # Upload každých 10 minút
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
             date_str = now.strftime("%d-%m-%Y")
