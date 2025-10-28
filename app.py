@@ -29,7 +29,7 @@ def main():
             last_title = song_data["title"]
             song_session_id = song_data["song_session_id"]
             save_locally(song_session_id, "song", song_data)
-            listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, duration=30))
+            listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=30))
             save_locally(song_session_id, "listeners", listeners)
             file_buffer.append((song_session_id, song_data, listeners))
 
