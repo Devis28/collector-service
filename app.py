@@ -40,7 +40,7 @@ def main():
                     BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                 )
 
-            # LOOP: zachytáva listeners pokiaľ sa skladba nezmení!
+            # LOOP: listeners každých 30 sekúnd, kým sa skladba nezmení
             while True:
                 listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=30))
                 for l in listeners or []:
@@ -49,9 +49,10 @@ def main():
                         BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                     )
                 current_song = radio_melody.fetch_song()
-                if (current_song and current_song["title"] != last_title):
+                # Ak API vráti None, predpokladáme, že skladba sa nezmenila!
+                if (current_song is not None) and (current_song["title"] != last_title):
                     break
-
+                # Ak current_song je None, tento cyklus len pokračuje a o 30 sekúnd načíta listeners znova
 
 if __name__ == "__main__":
     try:
