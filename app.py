@@ -13,8 +13,8 @@ RADIO_NAME = "melody"
 def is_song_changed(song_a, song_b):
     if not song_b:
         return True
-    keys = ["title", "artist", "date", "time"]
-    return any(song_a["data"].get(k) != song_b["data"].get(k) for k in keys)
+    return (song_a["data"].get("title") != song_b["data"].get("title") or
+            song_a["data"].get("artist") != song_b["data"].get("artist"))
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
@@ -25,23 +25,19 @@ def main():
     song_data_batch = []
     listeners_data_batch = []
 
-    last_recorded_song_data = None  # čisté údaje: title, artist, date, time
+    previous_song = None
     current_session_id = None
 
     while True:
         current_song = get_current_song()
-        current_song_data = {
-            k: current_song["data"].get(k)
-            for k in ["title", "artist", "date", "time"]
-        }
 
-        # Ak sa song zmenil (údaje sú iné), VYKONAJ zápis
-        if current_song_data != last_recorded_song_data:
+        # Song zapíš LEN ak sa zmenil title alebo artist
+        if is_song_changed(current_song, previous_song):
             current_session_id = current_song["song_session_id"]
-            last_recorded_song_data = current_song_data
+            previous_song = current_song
             song_data_batch.append(current_song)
 
-        # Zápis listeners každých 30 sekúnd ku aktuálnemu session_id
+        # Listeners zapisuj vždy k session_id aktuálnej skladby
         listeners_data = asyncio.run(get_current_listeners())
         listeners_data["song_session_id"] = current_session_id
         log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", current_session_id)
