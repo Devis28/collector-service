@@ -71,4 +71,4 @@ def process_and_log_listeners(song_signature=None):
             return None
 
 def start_background_flask():
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8000, debug=False, use_reloader=False), daemon=True).start()
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=8001, debug=False, use_reloader=False), daemon=True).start()
