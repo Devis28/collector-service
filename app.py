@@ -27,23 +27,23 @@ def main():
 
     previous_song = None
     current_session_id = None
-    song_recorded = False  # indikátor, či bola skladba už zapísaná
+    song_recorded = True  # musí byť True pred prvým cyklom!
 
     while True:
         current_song = get_current_song()
 
-        # Ak sa skladba zmení, zaznamenaj ju 1x a vygeneruj nové session_id
+        # Ak sa skladba zmenila: nastav song_recorded na False, vygeneruj session_id, nastav previous_song
         if is_song_changed(current_song, previous_song):
             current_session_id = current_song["song_session_id"]
             previous_song = current_song
             song_recorded = False
 
-        # Zapíš skladbu len raz po zistení zmeny
+        # Zapíš song LEN raz po zmene
         if not song_recorded:
             song_data_batch.append(current_song)
             song_recorded = True
 
-        # Listeners zapisuj stále k aktuálnemu session_id (každých 30s)
+        # Listeners zapisuj každých 30 sekúnd ku aktuálnemu session_id
         listeners_data = asyncio.run(get_current_listeners())
         listeners_data["song_session_id"] = current_session_id
         log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", current_session_id)
