@@ -1,17 +1,17 @@
 import time
 import json
+import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import asyncio
-from adapters.radio_melody import get_current_song, get_listeners
+from adapters.radio_melody import get_current_song, get_current_listeners, log_radio_event
 from writer import upload_file
 
-INTERVAL = 30     # sekund pre polling songu/listeners
-BATCH_TIME = 600  # 10 minút (v sekundách)
+INTERVAL = 30     # sekund (pollovanie songu aj listeners)
+BATCH_TIME = 600  # 10 minút
 RADIO_NAME = "melody"
 
 def is_song_changed(song_a, song_b):
-    if not song_b:  # prvý beh vždy True
+    if not song_b:
         return True
     keys = ["title", "artist", "date", "time"]
     return any(song_a["data"].get(k) != song_b["data"].get(k) for k in keys)
@@ -24,21 +24,25 @@ def main():
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
-    previous_song_record = None
+
+    previous_song = None
+    current_session_id = None
 
     while True:
-        current_song_record = get_current_song()
-        current_song_data = current_song_record["data"]
+        current_song = get_current_song()
+        # Ak sa zmení pesnička, vygeneruje sa nový session_id a zápis songu do batchu
+        if is_song_changed(current_song, previous_song):
+            current_session_id = current_song["song_session_id"]
+            previous_song = current_song
+            song_data_batch.append(current_song)
 
-        if is_song_changed(current_song_record, previous_song_record):
-            session_id = current_song_record["song_session_id"]
-            previous_song_record = current_song_record
+        # Zachytá listeners (každých 30s, ku aktuálnemu session_id)
+        listeners_data = asyncio.run(get_current_listeners())
+        listeners_data["song_session_id"] = current_session_id
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data['data'].get('listeners', '?')}", current_session_id)
+        listeners_data_batch.append(listeners_data)
 
-            listeners = asyncio.run(get_listeners(session_id, interval=INTERVAL, duration=BATCH_TIME))
-            song_data_batch.append(current_song_record)
-            listeners_data_batch.extend(listeners)
-
-        # Každých 10 minút upload batch do Cloudflare s presným timestampom (Europe/Bratislava)
+        # Ukladanie každých 10 minút
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
             date_str = now.strftime("%d-%m-%Y")

@@ -1,6 +1,6 @@
 import requests
-import asyncio
 import websockets
+import asyncio
 import json
 import uuid
 from datetime import datetime
@@ -40,25 +40,21 @@ def get_current_song():
             "song_session_id": session_id
         }
 
-async def get_listeners(song_session_id, interval=30, duration=600):
-    results = []
-    start = datetime.now(ZoneInfo("Europe/Bratislava"))
-    required_fields = ["last_update", "listeners"]
+async def get_current_listeners():
+    listeners_data = {}
+    session = await websockets.connect(LISTENERS_WS)
     try:
-        async with websockets.connect(LISTENERS_WS) as ws:
-            while (datetime.now(ZoneInfo("Europe/Bratislava")) - start).total_seconds() < duration:
-                msg = await ws.recv()
-                data = json.loads(msg)
-                valid = all(k in data for k in required_fields)
-                listeners_count = data.get("listeners", 0)
-                log_radio_event("melody", f"Zachytení poslucháči: {listeners_count}", song_session_id)
-                results.append({
-                    "data": data,
-                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                    "raw_valid": valid,
-                    "song_session_id": song_session_id
-                })
-                await asyncio.sleep(interval)
+        msg = await asyncio.wait_for(session.recv(), timeout=10)
+        data = json.loads(msg)
+        required_fields = ["last_update", "listeners"]
+        valid = all(k in data for k in required_fields)
+        listeners_data = {
+            "data": data,
+            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+            "raw_valid": valid
+        }
     except Exception as e:
-        log_radio_event("melody", f"Chyba pri získavaní listeners: {e}", song_session_id)
-    return results
+        listeners_data = {"error": str(e)}
+    finally:
+        await session.close()
+    return listeners_data
