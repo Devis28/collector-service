@@ -26,7 +26,6 @@ def fetch_song():
     data["song_session_id"] = str(uuid.uuid4())
 
     song_key = f"{data.get('artist', '?')}–{data.get('title', '?')}"
-    # Eviduj song bez ohľadu na validitu a vypíš všetko
     if song_key not in seen_song_titles:
         seen_song_titles.add(song_key)
         print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')} | Session ID: {data['song_session_id']} | raw_valid: {raw_valid}")
