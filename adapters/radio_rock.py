@@ -6,8 +6,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-SONG_API = "https://rock-server.fly.dev/pullplaying"
-LISTENERS_WS = "wss://rock-server.fly.dev/wspushlistenership"
+SONG_API = "https://rock-server.fly.dev/pull/playing"
+LISTENERS_WS = "wss://rock-server.fly.dev/ws/push/listenership"
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
