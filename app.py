@@ -12,6 +12,7 @@ STATION = "melody"
 
 def main():
     last_title = None
+
     while True:
         song_data = radio_melody.fetch_song()
         if song_data is None:
@@ -30,15 +31,15 @@ def main():
                 json_data=song_data
             )
 
-            # Okamžite načítaj aspoň jeden listeners hneď po song
-            listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=1))
+            # --- OPRAVA TU: načítaj listeners okamžite po zápise skladby
+            listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=0.5))  # hneď, bez čakania
             for l in listeners:
                 listen_dt = datetime.fromisoformat(l["recorded_at"])
                 upload_bronze_station(
                     BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                 )
 
-            # Štandardný intervalový cyklus na listeners
+            # potom tradičný cyklus
             while True:
                 listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=30))
                 for l in listeners:
@@ -47,9 +48,8 @@ def main():
                         BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                     )
                 current_song = radio_melody.fetch_song()
-                if current_song is not None and current_song["title"] != last_title:
+                if current_song and current_song["title"] != last_title:
                     break
-
 
 if __name__ == "__main__":
     main()
