@@ -1,11 +1,11 @@
 import time
 import json
 import asyncio
+import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from adapters.radio_melody import get_current_song, get_current_listeners, log_radio_event
 from writer import upload_file
-import uuid
 
 INTERVAL = 30
 BATCH_TIME = 600
@@ -19,7 +19,6 @@ def main():
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
-
     previous_title = None
     previous_artist = None
     session_id = None
@@ -29,23 +28,22 @@ def main():
         title = current_song["data"].get("title")
         artist = current_song["data"].get("artist")
 
-        # Song sa zapíše IBA ak je iný title alebo artist
+        # Pri zmene songu vygeneruj nové session_id, zapíš song len raz
         if title != previous_title or artist != previous_artist:
-            session_id = str(uuid.uuid4())  # VYGENERUJ IBA PRI ZMENE
+            session_id = str(uuid.uuid4())
             previous_title = title
             previous_artist = artist
-            # DOPLŇ song_session_id do objektu
             current_song["song_session_id"] = session_id
             log_radio_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
             song_data_batch.append(current_song)
 
-        # Listeners zapisuj vždy k aktuálnemu session_id, nevolaj get_current_song znova!
+        # Zachytávaj listeners podľa session_id, každých 30s
         listeners_data = asyncio.run(get_current_listeners())
         listeners_data["song_session_id"] = session_id
         log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", session_id)
         listeners_data_batch.append(listeners_data)
 
-        # Upload každých 10 minút
+        # Po 10 minútach upload batch na Cloudflare
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
             date_str = now.strftime("%d-%m-%Y")
@@ -66,7 +64,6 @@ def main():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
-
 
 if __name__ == "__main__":
     main()
