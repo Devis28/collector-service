@@ -4,9 +4,14 @@ import websockets
 import datetime
 import uuid
 import json
+import zoneinfo
 
 SONG_API = "https://radio-melody-api.fly.dev/song"
 LISTENERS_WS = "wss://radio-melody-api.fly.dev/ws/listeners"
+TZI = zoneinfo.ZoneInfo("Europe/Bratislava")
+
+def now_bratislava():
+    return datetime.datetime.now(TZI).strftime("%d.%m.%Y %H:%M:%S")
 
 def fetch_song():
     response = requests.get(SONG_API)
@@ -16,11 +21,14 @@ def fetch_song():
     data["recorded_at"] = datetime.datetime.now().isoformat()
     data["raw_valid"] = raw_valid
     data["song_session_id"] = str(uuid.uuid4()) if raw_valid else None
+    # Výpis skladby
+    print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')}")
     return data
 
 async def collect_listeners(song_session_id, duration=30):
     listeners_records = []
     start = datetime.datetime.now()
+    print(f"[{now_bratislava()}] [MELODY] Čakám na údaje o poslucháčoch (listeners)...")
     async with websockets.connect(LISTENERS_WS) as ws:
         while (datetime.datetime.now() - start).seconds < duration:
             try:
@@ -32,6 +40,8 @@ async def collect_listeners(song_session_id, duration=30):
                 info["raw_valid"] = raw_valid
                 info["song_session_id"] = song_session_id
                 listeners_records.append(info)
+                # Výpis nájdených listeners
+                print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')}")
             except asyncio.TimeoutError:
                 continue  # No message, reconnect or skip
     return listeners_records
