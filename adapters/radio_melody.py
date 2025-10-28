@@ -23,13 +23,13 @@ def fetch_song():
     raw_valid = all(data.get(col) for col in required)
     data["recorded_at"] = datetime.datetime.now().isoformat()
     data["raw_valid"] = raw_valid
-    data["song_session_id"] = str(uuid.uuid4()) if raw_valid else None
+    data["song_session_id"] = str(uuid.uuid4())
 
-    # Výpis a evidencia len ak nový song (podľa title + artist)
     song_key = f"{data.get('artist', '?')}–{data.get('title', '?')}"
-    if raw_valid and song_key not in seen_song_titles:
+    # Eviduj song bez ohľadu na validitu a vypíš všetko
+    if song_key not in seen_song_titles:
         seen_song_titles.add(song_key)
-        print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')} | Session ID: {data['song_session_id']}")
+        print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')} | Session ID: {data['song_session_id']} | raw_valid: {raw_valid}")
         return data
     return None
 
@@ -47,14 +47,13 @@ async def collect_listeners(song_session_id, interval=30):
                 message = await asyncio.wait_for(ws.recv(), timeout=timeout)
                 info = json.loads(message)
                 required = ["listeners", "last_update"]
-                raw_valid = all(col in info for col in required)
+                raw_valid = all(info.get(col) for col in required)
                 info["recorded_at"] = datetime.datetime.now().isoformat()
                 info["raw_valid"] = raw_valid
                 info["song_session_id"] = song_session_id
                 if not listener_record:
                     listener_record = info
-                    print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')} | Session ID: {song_session_id}")
+                    print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')} | Session ID: {song_session_id} | raw_valid: {raw_valid}")
             except asyncio.TimeoutError:
                 break
     return [listener_record] if listener_record else []
-
