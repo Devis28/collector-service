@@ -11,9 +11,22 @@ LISTENERS_WS = "wss://radio-melody-api.fly.dev/ws/listeners"
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    prefix = "[MELODY]"
-    sid = f"[{session_id}]" if session_id else ""
-    print(f"{prefix} [{timestamp}] [{radio_name}] {sid} {text}")
+    session_part = f" [{session_id}]" if session_id else ""
+    print(f"[{timestamp}] [{radio_name}]{session_part} {text}")
+
+def flatten_song(song_obj, session_id):
+    result = dict(song_obj["data"])
+    result["recorded_at"] = song_obj.get("recorded_at")
+    result["raw_valid"] = song_obj.get("raw_valid")
+    result["song_session_id"] = session_id
+    return result
+
+def flatten_listener(listener_obj, session_id):
+    result = dict(listener_obj.get("data", {}))
+    result["recorded_at"] = listener_obj.get("recorded_at")
+    result["raw_valid"] = listener_obj.get("raw_valid")
+    result["song_session_id"] = session_id
+    return result
 
 def get_current_song():
     try:
@@ -51,3 +64,8 @@ async def get_current_listeners():
     finally:
         await session.close()
     return listeners_data
+
+def log_cloudflare_upload(radio_name, r2_path):
+    now = datetime.now(ZoneInfo("Europe/Bratislava"))
+    timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
+    print(f"[{timestamp}] [{radio_name}] Dáta nahrané do Cloudflare: {r2_path}")
