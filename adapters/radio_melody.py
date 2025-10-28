@@ -8,10 +8,12 @@ from zoneinfo import ZoneInfo
 SONG_API = "https://radio-melody-api.fly.dev/song"
 LISTENERS_WS = "wss://radio-melody-api.fly.dev/ws/listeners"
 
-def log_radio_event(radio_name, text, session_id):
+def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    print(f"[{timestamp}] [{radio_name}] [{session_id}] {text}")
+    prefix = "[MELODY]"
+    sid = f"[{session_id}]" if session_id else ""
+    print(f"{prefix} [{timestamp}] [{radio_name}] {sid} {text}")
 
 def get_current_song():
     try:

@@ -1,6 +1,7 @@
 import os
 import boto3
 from dotenv import load_dotenv
+from adapters.radio_melody import log_radio_event
 
 load_dotenv()
 
@@ -17,6 +18,7 @@ r2 = session.client(
     endpoint_url=R2_ENDPOINT,
 )
 
-def upload_file(local_path, r2_object_path):
+def upload_file(local_path, r2_object_path, radio_name="Rádio Melody"):
     with open(local_path, "rb") as data:
         r2.upload_fileobj(data, R2_BUCKET, r2_object_path)
+    log_radio_event(radio_name, f"Dáta nahrané do Cloudflare: {r2_object_path}")
