@@ -31,15 +31,17 @@ def main():
                 json_data=song_data
             )
 
-            # --- OPRAVA TU: načítaj listeners okamžite po zápise skladby
-            listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=0.5))  # hneď, bez čakania
+            # Hneď po novej skladbe fetchni listeners
+            listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=0.5))
             for l in listeners:
                 listen_dt = datetime.fromisoformat(l["recorded_at"])
                 upload_bronze_station(
                     BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                 )
 
-            # potom tradičný cyklus
+            # Začína robustný cyklus na listeners s watchdogom
+            stuck_counter = 0
+            MAX_STUCK = 6  # 6*30s = 3 min
             while True:
                 listeners = asyncio.run(radio_melody.collect_listeners(song_session_id, interval=30))
                 for l in listeners:
@@ -47,8 +49,18 @@ def main():
                     upload_bronze_station(
                         BUCKET, "listeners", STATION, timestamp=listen_dt, json_data=l
                     )
+
                 current_song = radio_melody.fetch_song()
                 if current_song and current_song["title"] != last_title:
+                    break
+
+                if not listeners:
+                    stuck_counter += 1
+                else:
+                    stuck_counter = 0
+
+                if stuck_counter > MAX_STUCK:
+                    print(f"[WARNING] Song '{last_title}' trvá nezvyčajne dlho bez listeners, preskakujem...")
                     break
 
 if __name__ == "__main__":
