@@ -2,24 +2,30 @@ import time
 import json
 import asyncio
 import uuid
+import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from adapters.radio_melody import (
-    get_current_song, get_current_listeners,
-    log_radio_event, log_cloudflare_upload,
-    flatten_song, flatten_listener
+    get_current_song as get_song_melody,
+    get_current_listeners as get_listeners_melody,
+    log_radio_event as log_melody_event,
+)
+from adapters.radio_rock import (
+    get_current_song as get_song_rock,
+    get_current_listeners as get_listeners_rock,
+    log_radio_event as log_rock_event,
 )
 from writer import upload_file
 
 INTERVAL = 30
 BATCH_TIME = 600
-RADIO_NAME = "MELODY"
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def main():
+def melody_worker():
+    RADIO_NAME = "MELODY"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
@@ -28,7 +34,7 @@ def main():
     session_id = None
 
     while True:
-        current_song = get_current_song()
+        current_song = get_song_melody()
         title = current_song["data"].get("title")
         artist = current_song["data"].get("artist")
 
@@ -36,25 +42,27 @@ def main():
             session_id = str(uuid.uuid4())
             previous_title = title
             previous_artist = artist
-            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
-            song_data_batch.append(flatten_song(current_song, session_id))
+            current_song["song_session_id"] = session_id
+            log_melody_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
+            song_data_batch.append(current_song)
 
-        listeners_data = asyncio.run(get_current_listeners())
-        listeners_data_batch.append(flatten_listener(listeners_data, session_id))
-        log_radio_event(
+        listeners_data = asyncio.run(get_listeners_melody())
+        listeners_data["song_session_id"] = session_id
+        log_melody_event(
             RADIO_NAME,
             f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}",
             session_id
         )
+        listeners_data_batch.append(listeners_data)
 
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
             date_str = now.strftime("%d-%m-%Y")
             timestamp = now.strftime("%d-%m-%YT%H-%M-%S")
-            song_path_local = f"{timestamp}_song.json"
-            listeners_path_local = f"{timestamp}_listeners.json"
-            song_path_r2 = f"bronze/{RADIO_NAME}/song/{date_str}/{timestamp}.json"
-            listeners_path_r2 = f"bronze/{RADIO_NAME}/listeners/{date_str}/{timestamp}.json"
+            song_path_local = f"{timestamp}_melody_song.json"
+            listeners_path_local = f"{timestamp}_melody_listeners.json"
+            song_path_r2 = f"bronze/MELODY/song/{date_str}/{timestamp}.json"
+            listeners_path_r2 = f"bronze/MELODY/listeners/{date_str}/{timestamp}.json"
 
             save_json(song_data_batch, song_path_local)
             save_json(listeners_data_batch, listeners_path_local)
@@ -62,14 +70,76 @@ def main():
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
 
-            log_cloudflare_upload(RADIO_NAME, song_path_r2)
-            log_cloudflare_upload(RADIO_NAME, listeners_path_r2)
+            log_melody_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_melody_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
 
-            song_data_batch = []
-            listeners_data_batch = []
+            song_data_batch.clear()
+            listeners_data_batch.clear()
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
+
+def rock_worker():
+    RADIO_NAME = "ROCK"
+    last_batch_time = time.time()
+    song_data_batch = []
+    listeners_data_batch = []
+    previous_title = None
+    previous_author = None
+    session_id = None
+
+    while True:
+        current_song = get_song_rock()
+        song = current_song.get("song", {})
+        title = song.get("musicTitle")
+        author = song.get("musicAuthor")
+
+        # Zmena songu podľa title/author
+        if title != previous_title or author != previous_author:
+            session_id = str(uuid.uuid4())
+            previous_title = title
+            previous_author = author
+            current_song["song_session_id"] = session_id
+            log_rock_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
+            song_data_batch.append(current_song)
+
+        listeners_data = asyncio.run(get_listeners_rock(session_id))
+        log_rock_event(
+            RADIO_NAME,
+            f"Zachytení poslucháči: {listeners_data.get('listeners', '?')}",
+            session_id
+        )
+        listeners_data_batch.append(listeners_data)
+
+        if time.time() - last_batch_time >= BATCH_TIME:
+            now = datetime.now(ZoneInfo("Europe/Bratislava"))
+            date_str = now.strftime("%d-%m-%Y")
+            timestamp = now.strftime("%d-%m-%YT%H-%M-%S")
+            song_path_local = f"{timestamp}_rock_song.json"
+            listeners_path_local = f"{timestamp}_rock_listeners.json"
+            song_path_r2 = f"bronze/ROCK/song/{date_str}/{timestamp}.json"
+            listeners_path_r2 = f"bronze/ROCK/listeners/{date_str}/{timestamp}.json"
+
+            save_json(song_data_batch, song_path_local)
+            save_json(listeners_data_batch, listeners_path_local)
+
+            upload_file(song_path_local, song_path_r2)
+            upload_file(listeners_path_local, listeners_path_r2)
+
+            log_rock_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_rock_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+
+            song_data_batch.clear()
+            listeners_data_batch.clear()
+            last_batch_time = time.time()
+
+        time.sleep(INTERVAL)
+
+def main():
+    threading.Thread(target=melody_worker, daemon=True).start()
+    threading.Thread(target=rock_worker, daemon=True).start()
+    while True:
+        time.sleep(60)  # Main thread beží donekonečna, workers idú v backgrounde
 
 if __name__ == "__main__":
     main()
