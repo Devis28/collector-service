@@ -1,62 +1,83 @@
-import requests
-import asyncio
-import websockets
-import datetime
-import uuid
-import json
-import zoneinfo
-import time
+# adapters/radio_melody.py
+import os, json, asyncio, urllib.request
+from typing import Dict, Any
 
-SONG_API = "https://radio-melody-api.fly.dev/song"
-LISTENERS_WS = "wss://radio-melody-api.fly.dev/ws/listeners"
-TZI = zoneinfo.ZoneInfo("Europe/Bratislava")
+# HTTP: aktuálny song (RAW, ploché polia podľa dokumentácie)
+MELODY_HTTP_SONG_URL = os.getenv(
+    "MELODY_HTTP_SONG_URL",
+    "https://radio-melody-api.fly.dev/song",
+)
 
-def now_bratislava():
-    return datetime.datetime.now(TZI).strftime("%d.%m.%Y %H:%M:%S")
+# WS: priebežný listeners (RAW) {"last_update":"DD.MM.YYYY HH:MM:SS","listeners":N}
+MELODY_WS_LISTENERS = os.getenv(
+    "MELODY_WS_LISTENERS",
+    "wss://radio-melody-api.fly.dev/ws/listeners",
+)
 
-seen_song_titles = set()
+# Ako často pollovať song HTTP (sekundy)
+MELODY_POLL_SECS = float(os.getenv("MELODY_POLL_SECS", "60"))
 
-def fetch_song():
-    response = requests.get(SONG_API)
-    data = response.json()
-    required = ["station", "title", "artist", "date", "time", "last_update"]
-    raw_valid = all(data.get(col) for col in required)
-    data["recorded_at"] = datetime.datetime.now().isoformat()
-    data["raw_valid"] = raw_valid
-    data["song_session_id"] = str(uuid.uuid4())
+# ---- mapre (RAW) -------------------------------------------------------------
 
-    song_key = f"{data.get('artist', '?')}–{data.get('title', '?')}"
-    if song_key not in seen_song_titles:
-        seen_song_titles.add(song_key)
-        print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')} | Session ID: {data['song_session_id']} | raw_valid: {raw_valid}")
-        return data
-    return None
+def _map_song_http(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Vraciame *presne* to, čo prišlo z /song (station/title/artist/date/time/last_update).
+    Nič nepridávame ani nepremenovávame.
+    """
+    return dict(payload or {})
 
-async def collect_listeners(song_session_id, interval=30):
-    print(f"[{now_bratislava()}] [MELODY] Čakám na údaje o poslucháčoch (listeners)...")
-    start_time = time.time()
-    listener_record = None
-    # Robustný reconnect pri výpadku/padnutí websocketu
-    try:
-        async with websockets.connect(LISTENERS_WS) as ws:
-            while True:
-                elapsed = time.time() - start_time
-                if elapsed >= interval:
-                    break
-                try:
-                    timeout = interval - elapsed if interval - elapsed > 0 else 1
-                    message = await asyncio.wait_for(ws.recv(), timeout=timeout)
-                    info = json.loads(message)
-                    required = ["listeners", "last_update"]
-                    raw_valid = all(info.get(col) for col in required)
-                    info["recorded_at"] = datetime.datetime.now().isoformat()
-                    info["raw_valid"] = raw_valid
-                    info["song_session_id"] = song_session_id
-                    if not listener_record:
-                        listener_record = info
-                        print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')} | Session ID: {song_session_id} | raw_valid: {raw_valid}")
-                except asyncio.TimeoutError:
-                    break
-    except Exception as e:
-        print(f"[ERROR] WS Collect listeners: {e}")
-    return [listener_record] if listener_record else []
+def _map_listeners_ws(d: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Vraciame *presne* to, čo posiela WS /ws/listeners:
+      {"last_update":"DD.MM.YYYY HH:MM:SS","listeners": N}
+    """
+    return dict(d or {})
+
+# ---- jednoduchý HTTP fetch ---------------------------------------------------
+
+def _fetch_json(url: str, timeout: float = 10.0) -> Dict[str, Any]:
+    req = urllib.request.Request(url, headers={"User-Agent": "radio-collector"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+# ---- public register ---------------------------------------------------------
+
+def register(add_ws_consumer, add_hook):
+    """
+    - HTTP poller pre song -> bronze/melody/song (RAW)
+    - WebSocket listeners -> bronze/melody/listeners (RAW)
+    - App páruje: 1× listeners k poslednému novému songu.
+    """
+    # 1) WS listeners
+    add_ws_consumer(
+        station="melody",
+        url=MELODY_WS_LISTENERS,
+        kind="listeners",
+        map_fn=_map_listeners_ws,
+    )
+
+    # 2) HTTP song poller cez emit z add_hook (aby prešlo jednotnou ingest logikou a párovaním)
+    emit_song = add_hook(
+        station="melody",
+        path="/hook/melody/song",   # interne dostupné aj ako HTTP endpoint
+        kind="song",
+        map_fn=_map_song_http,
+    )
+
+    async def _poll_loop():
+        backoff = 2.0
+        while True:
+            try:
+                raw = _fetch_json(MELODY_HTTP_SONG_URL, timeout=10.0) or {}
+                await emit_song(raw)   # deduplikáciu a pairing rieši app.py
+                backoff = 2.0
+                await asyncio.sleep(MELODY_POLL_SECS)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                # exponenciálny backoff pri dočasných výpadkoch
+                await asyncio.sleep(min(backoff, 30.0))
+                backoff = min(backoff * 2.0, 30.0)
+
+    # app.py spustí tento poller ako task
+    return _poll_loop
