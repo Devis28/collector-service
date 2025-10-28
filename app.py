@@ -50,3 +50,10 @@ def main():
             upload_file(listeners_path, listeners_path)
 
         time.sleep(INTERVAL)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"Chyba v aplikácii: {e}")
+
