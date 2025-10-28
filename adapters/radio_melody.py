@@ -21,7 +21,7 @@ def get_current_song():
         required_fields = ["station", "title", "artist", "date", "time", "last_update"]
         valid = all(k in data for k in required_fields)
         song_title = data.get("title", "")
-        radio_name = data.get("station", "Rádio Melody")
+        radio_name = data.get("station", "melody")
         session_id = str(uuid.uuid4())
         log_radio_event(radio_name, f"Zachytená skladba: {song_title}", session_id)
         return {
@@ -32,7 +32,7 @@ def get_current_song():
         }
     except Exception as e:
         session_id = str(uuid.uuid4())
-        log_radio_event("Rádio Melody", f"Chyba pri získavaní skladby: {e}", session_id)
+        log_radio_event("melody", f"Chyba pri získavaní skladby: {e}", session_id)
         return {
             "data": {},
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
@@ -40,7 +40,7 @@ def get_current_song():
             "song_session_id": session_id
         }
 
-async def get_listeners(song_session_id, interval=30, duration=10*60):
+async def get_listeners(song_session_id, interval=30, duration=600):
     results = []
     start = datetime.now(ZoneInfo("Europe/Bratislava"))
     required_fields = ["last_update", "listeners"]
@@ -51,7 +51,7 @@ async def get_listeners(song_session_id, interval=30, duration=10*60):
                 data = json.loads(msg)
                 valid = all(k in data for k in required_fields)
                 listeners_count = data.get("listeners", 0)
-                log_radio_event("Rádio Melody", f"Zachytení poslucháči: {listeners_count}", song_session_id)
+                log_radio_event("melody", f"Zachytení poslucháči: {listeners_count}", song_session_id)
                 results.append({
                     "data": data,
                     "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
@@ -60,5 +60,5 @@ async def get_listeners(song_session_id, interval=30, duration=10*60):
                 })
                 await asyncio.sleep(interval)
     except Exception as e:
-        log_radio_event("Rádio Melody", f"Chyba pri získavaní listeners: {e}", song_session_id)
+        log_radio_event("melody", f"Chyba pri získavaní listeners: {e}", song_session_id)
     return results
