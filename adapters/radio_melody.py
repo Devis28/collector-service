@@ -1,83 +1,63 @@
-# adapters/radio_melody.py
-import os, json, asyncio, urllib.request
-from typing import Dict, Any
+import os
+import requests
+from datetime import datetime
+import time
 
-# HTTP: aktuálny song (RAW, ploché polia podľa dokumentácie)
-MELODY_HTTP_SONG_URL = os.getenv(
-    "MELODY_HTTP_SONG_URL",
-    "https://radio-melody-api.fly.dev/song",
-)
+ENDPOINT = os.getenv("MELODY_ENDPOINT") or "https://api.radio-melody.sk/song"
+LISTENERS_ENDPOINT = os.getenv("MELODY_LISTENERS_ENDPOINT") or "https://api.radio-melody.sk/listeners"
 
-# WS: priebežný listeners (RAW) {"last_update":"DD.MM.YYYY HH:MM:SS","listeners":N}
-MELODY_WS_LISTENERS = os.getenv(
-    "MELODY_WS_LISTENERS",
-    "wss://radio-melody-api.fly.dev/ws/listeners",
-)
+def fetch_song():
+    """Vráti dict so základnými údajmi o pesničke pripravený na zápis."""
+    try:
+        resp = requests.get(ENDPOINT, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            song_id = (
+                data.get("song_session_id")
+                or f"{data.get('artist','')}-{data.get('title','')}-{data.get('recorded_at','')}"
+            )
+            return {
+                "title": data.get("title"),
+                "song_session_id": song_id,
+                "recorded_at": data.get("recorded_at"),
+                "artist": data.get("artist"),
+                "raw_valid": True,
+            }
+        else:
+            print("[WARNING] fetch_song() response not ok:", resp.status_code)
+            return None
+    except Exception as e:
+        print("[WARNING] fetch_song() exception:", e)
+        return None
 
-# Ako často pollovať song HTTP (sekundy)
-MELODY_POLL_SECS = float(os.getenv("MELODY_POLL_SECS", "60"))
-
-# ---- mapre (RAW) -------------------------------------------------------------
-
-def _map_song_http(payload: Dict[str, Any]) -> Dict[str, Any]:
+def collect_listeners(song_session_id, interval=30):
     """
-    Vraciame *presne* to, čo prišlo z /song (station/title/artist/date/time/last_update).
-    Nič nepridávame ani nepremenovávame.
+    Každých 'interval' sekúnd vráti listeners pre aktuálnu skladbu.
     """
-    return dict(payload or {})
-
-def _map_listeners_ws(d: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Vraciame *presne* to, čo posiela WS /ws/listeners:
-      {"last_update":"DD.MM.YYYY HH:MM:SS","listeners": N}
-    """
-    return dict(d or {})
-
-# ---- jednoduchý HTTP fetch ---------------------------------------------------
-
-def _fetch_json(url: str, timeout: float = 10.0) -> Dict[str, Any]:
-    req = urllib.request.Request(url, headers={"User-Agent": "radio-collector"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-# ---- public register ---------------------------------------------------------
-
-def register(add_ws_consumer, add_hook):
-    """
-    - HTTP poller pre song -> bronze/melody/song (RAW)
-    - WebSocket listeners -> bronze/melody/listeners (RAW)
-    - App páruje: 1× listeners k poslednému novému songu.
-    """
-    # 1) WS listeners
-    add_ws_consumer(
-        station="melody",
-        url=MELODY_WS_LISTENERS,
-        kind="listeners",
-        map_fn=_map_listeners_ws,
-    )
-
-    # 2) HTTP song poller cez emit z add_hook (aby prešlo jednotnou ingest logikou a párovaním)
-    emit_song = add_hook(
-        station="melody",
-        path="/hook/melody/song",   # interne dostupné aj ako HTTP endpoint
-        kind="song",
-        map_fn=_map_song_http,
-    )
-
-    async def _poll_loop():
-        backoff = 2.0
-        while True:
-            try:
-                raw = _fetch_json(MELODY_HTTP_SONG_URL, timeout=10.0) or {}
-                await emit_song(raw)   # deduplikáciu a pairing rieši app.py
-                backoff = 2.0
-                await asyncio.sleep(MELODY_POLL_SECS)
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                # exponenciálny backoff pri dočasných výpadkoch
-                await asyncio.sleep(min(backoff, 30.0))
-                backoff = min(backoff * 2.0, 30.0)
-
-    # app.py spustí tento poller ako task
-    return _poll_loop
+    time.sleep(interval)
+    try:
+        resp = requests.get(LISTENERS_ENDPOINT, timeout=5)
+        if resp.ok:
+            data = resp.json()
+            output = []
+            # Môže byť buď dict alebo list (podľa API odpovede)
+            listeners_data = data if isinstance(data, list) else [data]
+            for l in listeners_data:
+                output.append({
+                    "recorded_at": l.get("recorded_at", datetime.utcnow().isoformat()),
+                    "listeners": l.get("listeners"),
+                    "song_session_id": song_session_id,
+                    "raw_valid": True,
+                })
+            return output
+        else:
+            print("[WARNING] listeners-fetch response not ok:", resp.status_code)
+    except Exception as e:
+        print("[WARNING] listeners-fetch exception:", e)
+    # fallback - ak sa fetch nepodarí, vráť prázdny záznam s časom
+    return [{
+        "recorded_at": datetime.utcnow().isoformat(),
+        "listeners": 0,
+        "song_session_id": song_session_id,
+        "raw_valid": False,
+    }]
