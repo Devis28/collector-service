@@ -25,6 +25,9 @@ def main():
 
     while True:
         song_data = radio_melody.fetch_song()
+        if song_data is None:
+            time.sleep(30)
+            continue  # Preskoč cyklus, počkaj na ďalší song
         if last_title != song_data["title"]:
             last_title = song_data["title"]
             song_session_id = song_data["song_session_id"]

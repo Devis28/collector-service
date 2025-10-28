@@ -29,7 +29,7 @@ def fetch_song():
     song_key = f"{data.get('artist', '?')}–{data.get('title', '?')}"
     if raw_valid and song_key not in seen_song_titles:
         seen_song_titles.add(song_key)
-        print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')}")
+        print(f"[{now_bratislava()}] [MELODY] Zaznamenaná skladba: {data.get('artist', '?')} – {data.get('title', '?')} | Session ID: {data['song_session_id']}")
         return data
     return None
 
@@ -53,8 +53,8 @@ async def collect_listeners(song_session_id, interval=30):
                 info["song_session_id"] = song_session_id
                 if not listener_record:
                     listener_record = info
-                    print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')}")
-                # Čakaj do konca 30s, aj keď už si záznam našiel
+                    print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')} | Session ID: {song_session_id}")
             except asyncio.TimeoutError:
                 break
     return [listener_record] if listener_record else []
+
