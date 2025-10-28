@@ -36,23 +36,27 @@ async def collect_listeners(song_session_id, interval=30):
     print(f"[{now_bratislava()}] [MELODY] Čakám na údaje o poslucháčoch (listeners)...")
     start_time = time.time()
     listener_record = None
-    async with websockets.connect(LISTENERS_WS) as ws:
-        while True:
-            elapsed = time.time() - start_time
-            if elapsed >= interval:
-                break
-            try:
-                timeout = interval - elapsed if interval - elapsed > 0 else 1
-                message = await asyncio.wait_for(ws.recv(), timeout=timeout)
-                info = json.loads(message)
-                required = ["listeners", "last_update"]
-                raw_valid = all(info.get(col) for col in required)
-                info["recorded_at"] = datetime.datetime.now().isoformat()
-                info["raw_valid"] = raw_valid
-                info["song_session_id"] = song_session_id
-                if not listener_record:
-                    listener_record = info
-                    print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')} | Session ID: {song_session_id} | raw_valid: {raw_valid}")
-            except asyncio.TimeoutError:
-                break
+    # Robustný reconnect pri výpadku/padnutí websocketu
+    try:
+        async with websockets.connect(LISTENERS_WS) as ws:
+            while True:
+                elapsed = time.time() - start_time
+                if elapsed >= interval:
+                    break
+                try:
+                    timeout = interval - elapsed if interval - elapsed > 0 else 1
+                    message = await asyncio.wait_for(ws.recv(), timeout=timeout)
+                    info = json.loads(message)
+                    required = ["listeners", "last_update"]
+                    raw_valid = all(info.get(col) for col in required)
+                    info["recorded_at"] = datetime.datetime.now().isoformat()
+                    info["raw_valid"] = raw_valid
+                    info["song_session_id"] = song_session_id
+                    if not listener_record:
+                        listener_record = info
+                        print(f"[{now_bratislava()}] [MELODY] Zaznamenaný listeners: {info.get('listeners', '?')} | Session ID: {song_session_id} | raw_valid: {raw_valid}")
+                except asyncio.TimeoutError:
+                    break
+    except Exception as e:
+        print(f"[ERROR] WS Collect listeners: {e}")
     return [listener_record] if listener_record else []
