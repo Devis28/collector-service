@@ -6,8 +6,8 @@ from zoneinfo import ZoneInfo
 from adapters.radio_melody import get_current_song, get_current_listeners, log_radio_event
 from writer import upload_file
 
-INTERVAL = 30     # sekund (pollovanie songu aj listeners)
-BATCH_TIME = 600  # 10 minút
+INTERVAL = 30
+BATCH_TIME = 600
 RADIO_NAME = "melody"
 
 def is_song_changed(song_a, song_b):
@@ -30,16 +30,16 @@ def main():
 
     while True:
         current_song = get_current_song()
-        # Ak sa zmení pesnička, vygeneruje sa nový session_id a zápis songu do batchu
+        # Ak sa zmení pesnička, vygeneruj nový session_id a zapíš song
         if is_song_changed(current_song, previous_song):
             current_session_id = current_song["song_session_id"]
             previous_song = current_song
             song_data_batch.append(current_song)
 
-        # Zachytá listeners (každých 30s, ku aktuálnemu session_id)
+        # Získaj listeners pre aktuálnu session_id (každých 30s)
         listeners_data = asyncio.run(get_current_listeners())
         listeners_data["song_session_id"] = current_session_id
-        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data['data'].get('listeners', '?')}", current_session_id)
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}", current_session_id)
         listeners_data_batch.append(listeners_data)
 
         # Ukladanie každých 10 minút
