@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import uuid
 
 SONG_API = "https://funradio-server.fly.dev/pull/playing"
-LISTENERS_WS = "https://funradio-server.fly.dev/ws/push/listenership"
+LISTENERS_WS = "wss://funradio-server.fly.dev/ws/push/listenership"
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
