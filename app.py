@@ -202,6 +202,7 @@ def funradio_worker():
 
         time.sleep(INTERVAL)
 
+
 def expres_worker():
     RADIO_NAME = "EXPRES"
     last_batch_time = time.time()
@@ -211,25 +212,38 @@ def expres_worker():
     session_id = None
 
     while True:
-        current_song = get_song_expres()  # načíta posledný prijatý payload
+        current_song = get_song_expres()
         song = current_song["data"]
         title = song.get("song")
         artist = ", ".join(song.get("artists", []))
 
-        if title and (title != previous_song):
+        # Použijeme kombináciu titulu a umelca na detekciu zmeny
+        current_song_identifier = f"{title}_{artist}"
+
+        if title and (current_song_identifier != previous_song):
             session_id = current_song.get("song_session_id", str(uuid.uuid4()))
-            previous_song = title
+            previous_song = current_song_identifier
             current_song["song_session_id"] = session_id
-            log_expres_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
+            log_expres_event(RADIO_NAME, f"Zachytená skladba: {title} - {artist}", session_id)
             song_data_batch.append(current_song)
 
+        # Získanie poslucháčov - SYNCHRONNE, nie asynchrónne!
         listeners_data = get_listeners_expres(session_id)
-        listeners_data["song_session_id"] = session_id
-        log_expres_event(
-            RADIO_NAME,
-            f"Zachytení poslucháči: {listeners_data.get('listeners', '?')}",
-            session_id
-        )
+
+        # Logovanie podľa dostupnosti dát
+        if listeners_data.get('raw_valid') and listeners_data.get('listeners') is not None:
+            log_expres_event(
+                RADIO_NAME,
+                f"Zachytení poslucháči: {listeners_data.get('listeners')}",
+                session_id
+            )
+        else:
+            log_expres_event(
+                RADIO_NAME,
+                "Nepodarilo sa získať dáta o poslucháčoch",
+                session_id
+            )
+
         listeners_data_batch.append(listeners_data)
 
         if time.time() - last_batch_time >= BATCH_TIME:
@@ -258,10 +272,16 @@ def expres_worker():
 
 
 def main():
+    from adapters.radio_expres import start_expres_webhook
+
+    # Spusti Flask server pre Expres webhook
+    start_expres_webhook()
+
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
     threading.Thread(target=funradio_worker, daemon=True).start()
     threading.Thread(target=expres_worker, daemon=True).start()
+
     while True:
         time.sleep(60)
 
