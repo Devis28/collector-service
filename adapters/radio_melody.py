@@ -4,6 +4,7 @@ import asyncio
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import uuid
 
 SONG_API = "https://radio-melody-api.fly.dev/song"
 LISTENERS_WS = "wss://radio-melody-api.fly.dev/ws/listeners"
@@ -14,53 +15,72 @@ def log_radio_event(radio_name, text, session_id=None):
     session_part = f" [{session_id}]" if session_id else ""
     print(f"[{timestamp}] [{radio_name}]{session_part} {text}")
 
-def flatten_song(song_obj, session_id):
-    result = dict(song_obj["data"])
-    result["recorded_at"] = song_obj.get("recorded_at")
-    result["raw_valid"] = song_obj.get("raw_valid")
-    result["song_session_id"] = session_id
-    return result
+def is_valid_song(data):
+    required = {"station", "title", "artist", "date", "time", "last_update"}
+    return isinstance(data, dict) and set(data.keys()) == required
 
-def flatten_listener(listener_obj, session_id):
-    result = dict(listener_obj.get("data", {}))
-    result["recorded_at"] = listener_obj.get("recorded_at")
-    result["raw_valid"] = listener_obj.get("raw_valid")
-    result["song_session_id"] = session_id
-    return result
+def is_valid_listeners(data):
+    required = {"last_update", "listeners"}
+    return isinstance(data, dict) and set(data.keys()) == required
+
+def flatten_song(song_obj):
+    raw = song_obj.get("raw", {})
+    session_id = song_obj["song_session_id"]
+    flat = dict(raw)
+    flat["recorded_at"] = song_obj["recorded_at"]
+    flat["raw_valid"] = song_obj["raw_valid"]
+    flat["song_session_id"] = session_id
+    return flat
+
+def flatten_listener(listener_obj):
+    raw = listener_obj.get("raw", {})
+    session_id = listener_obj["song_session_id"]
+    flat = dict(raw)
+    flat["recorded_at"] = listener_obj["recorded_at"]
+    flat["raw_valid"] = listener_obj["raw_valid"]
+    flat["song_session_id"] = session_id
+    return flat
 
 def get_current_song():
     try:
         r = requests.get(SONG_API)
         data = r.json()
-        required_fields = ["station", "title", "artist", "date", "time", "last_update"]
-        valid = all(k in data for k in required_fields)
+        raw_valid = is_valid_song(data)
+        session_id = str(uuid.uuid4())
         return {
-            "data": data,
+            "raw": data,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": valid
+            "raw_valid": raw_valid,
+            "song_session_id": session_id
         }
     except Exception as e:
         return {
-            "data": {},
+            "raw": {},
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": False
+            "raw_valid": False,
+            "song_session_id": str(uuid.uuid4())
         }
 
-async def get_current_listeners():
+async def get_current_listeners(session_id=None):
     listeners_data = {}
     session = await websockets.connect(LISTENERS_WS)
     try:
         msg = await asyncio.wait_for(session.recv(), timeout=10)
         data = json.loads(msg)
-        required_fields = ["last_update", "listeners"]
-        valid = all(k in data for k in required_fields)
+        raw_valid = is_valid_listeners(data)
         listeners_data = {
-            "data": data,
+            "raw": data,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": valid
+            "raw_valid": raw_valid,
+            "song_session_id": session_id
         }
     except Exception as e:
-        listeners_data = {"error": str(e)}
+        listeners_data = {
+            "raw": {},
+            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+            "raw_valid": False,
+            "song_session_id": session_id
+        }
     finally:
         await session.close()
     return listeners_data
