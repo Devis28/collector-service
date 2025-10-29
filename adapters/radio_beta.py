@@ -6,8 +6,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-SONG_API = "https://beta-server.fly.dev/song"  # nahraď reálnym endpointom
-LISTENERS_WS = "wss://beta-server.fly.dev/ws/listeners"  # nahraď reálnym endpointom
+SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"  # nahraď reálnym endpointom
+LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"  # nahraď reálnym endpointom
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
