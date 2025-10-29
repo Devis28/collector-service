@@ -48,10 +48,7 @@ async def get_current_listeners(session_id=None):
             try:
                 msg = await asyncio.wait_for(websocket.recv(), timeout=10)
                 data = json.loads(msg)
-                msg_type = data.get('type', 'unknown')
-
-                if msg_type == 'listeners_update':
-                    # Rozbalenie údajov z listeners_update správy
+                if data.get("type") == "listeners_update":
                     raw_valid = "listeners" in data and "last_update" in data
                     listeners_data = {
                         "listeners": data.get("listeners"),
@@ -60,8 +57,8 @@ async def get_current_listeners(session_id=None):
                         "raw_valid": raw_valid,
                         "song_session_id": session_id
                     }
-                    break  # zachytí len prvý listeners_update, ukončí
-            except Exception as e:
+                    break  # exit after first listeners_update
+            except Exception:
                 listeners_data = {
                     "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
                     "raw_valid": False,
