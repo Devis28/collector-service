@@ -100,7 +100,6 @@ def rock_worker():
         title = song.get("musicTitle")
         author = song.get("musicAuthor")
 
-        # Zmena songu podľa title/author
         if title != previous_title or author != previous_author:
             session_id = str(uuid.uuid4())
             previous_title = title
@@ -141,9 +140,8 @@ def rock_worker():
 
         time.sleep(INTERVAL)
 
-import time  # nezabudni načítať!
-
 def beta_worker():
+    import time  # musí byť kvôli sleep
     RADIO_NAME = "BETA"
     last_batch_time = time.time()
     song_data_batch = []
@@ -152,12 +150,9 @@ def beta_worker():
     previous_artist = None
     session_id = None
 
-    # WAIT UNTIL LISTENERS ARE NOT NONE
-    while True:
-        first = get_listeners_beta()
-        if first["listeners"] is not None:
-            break
-        print("[BETA] Čakám na prvé listeners dáta z websocketu...")
+    # Wait for valid listeners (background ws must already be running!)
+    while get_listeners_beta()["listeners"] is None:
+        print("[BETA] Čakám na listeners dáta z websocketu...")
         time.sleep(1)
 
     while True:
@@ -173,7 +168,7 @@ def beta_worker():
             log_beta_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
             song_data_batch.append(current_song)
 
-        listeners_data = get_listeners_beta(session_id)  # už iba obyčajný call
+        listeners_data = get_listeners_beta(session_id)
         listeners_data["song_session_id"] = session_id
         log_beta_event(
             RADIO_NAME,
@@ -206,14 +201,13 @@ def beta_worker():
 
         time.sleep(INTERVAL)
 
-
 def main():
     start_beta_listeners_ws()
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
     threading.Thread(target=beta_worker, daemon=True).start()
     while True:
-        time.sleep(60)  # Main thread beží donekonečna, workers idú v backgrounde
+        time.sleep(60)
 
 if __name__ == "__main__":
     main()
