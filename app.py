@@ -1,8 +1,8 @@
 import time
 import json
+import asyncio
 import uuid
 import threading
-import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from adapters.radio_melody import (
@@ -149,7 +149,7 @@ def beta_worker():
     previous_artist = None
     session_id = None
 
-    # Čakaj na prvé listeners, inak bude None
+    # Po štarte čakaj na listeners, kým príde prvá skutočná hodnota
     while get_listeners_beta()["listeners"] is None:
         print("[BETA] Čakám na listeners dáta z websocketu...")
         time.sleep(1)
