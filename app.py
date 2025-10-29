@@ -19,16 +19,18 @@ from adapters.radio_beta import (
     get_current_song as get_song_beta,
     get_current_listeners as get_listeners_beta,
     log_radio_event as log_beta_event,
-    start_beta_listeners_ws,
+    start_beta_listeners_ws
 )
 from writer import upload_file
 
 INTERVAL = 30
 BATCH_TIME = 600
 
+
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 def melody_worker():
     RADIO_NAME = "MELODY"
@@ -85,6 +87,7 @@ def melody_worker():
 
         time.sleep(INTERVAL)
 
+
 def rock_worker():
     RADIO_NAME = "ROCK"
     last_batch_time = time.time()
@@ -140,39 +143,45 @@ def rock_worker():
 
         time.sleep(INTERVAL)
 
+
 def beta_worker():
     RADIO_NAME = "BETA"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
     previous_title = None
-    previous_artist = None
+    previous_author = None
     session_id = None
-
-    while get_listeners_beta()["listeners"] is None:
-        print("[BETA] Čakám na listeners dáta z websocketu...")
-        time.sleep(1)
 
     while True:
         current_song = get_song_beta()
-        title = current_song["data"].get("title")
-        artist = current_song["data"].get("artist")
+        song = current_song.get("song", {})
+        title = song.get("musicTitle")
+        author = song.get("musicAuthor")
 
-        if title != previous_title or artist != previous_artist:
+        if title != previous_title or author != previous_author:
             session_id = str(uuid.uuid4())
             previous_title = title
-            previous_artist = artist
+            previous_author = author
             current_song["song_session_id"] = session_id
-            log_beta_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
+
+            if title and author:
+                log_beta_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
+            else:
+                log_beta_event(RADIO_NAME, "Rádio hrá reklamy alebo je ticho", session_id)
+
             song_data_batch.append(current_song)
 
-        listeners_data = get_listeners_beta(session_id)
-        listeners_data["song_session_id"] = session_id
+        # Získanie poslucháčov - pre Beta nemáme dáta kvôli obmedzeniam servera
+        listeners_data = asyncio.run(get_listeners_beta(session_id))
+
+        # Logovanie - informujeme, že dáta o poslucháčoch nie sú dostupné
         log_beta_event(
             RADIO_NAME,
-            f"Zachytení poslucháči: {listeners_data.get('listeners', '?')}",
+            "Dáta o poslucháčoch nie sú dostupné (obmedzenie servera)",
             session_id
         )
+
         listeners_data_batch.append(listeners_data)
 
         if time.time() - last_batch_time >= BATCH_TIME:
@@ -199,6 +208,7 @@ def beta_worker():
 
         time.sleep(INTERVAL)
 
+
 def main():
     start_beta_listeners_ws()
     threading.Thread(target=melody_worker, daemon=True).start()
@@ -206,6 +216,7 @@ def main():
     threading.Thread(target=beta_worker, daemon=True).start()
     while True:
         time.sleep(60)
+
 
 if __name__ == "__main__":
     main()
