@@ -20,6 +20,11 @@ from adapters.radio_funradio import (
     get_current_listeners as get_listeners_funradio,
     log_radio_event as log_funradio_event,
 )
+from adapters.radio_expres import (
+    get_current_song as get_song_expres,
+    get_current_listeners as get_listeners_expres,
+    log_radio_event as log_expres_event,
+)
 from writer import upload_file
 
 INTERVAL = 40
@@ -197,10 +202,66 @@ def funradio_worker():
 
         time.sleep(INTERVAL)
 
+def expres_worker():
+    RADIO_NAME = "EXPRES"
+    last_batch_time = time.time()
+    song_data_batch = []
+    listeners_data_batch = []
+    previous_song = None
+    session_id = None
+
+    while True:
+        current_song = get_song_expres()  # načíta posledný prijatý payload
+        song = current_song["data"]
+        title = song.get("song")
+        artist = ", ".join(song.get("artists", []))
+
+        if title and (title != previous_song):
+            session_id = current_song.get("song_session_id", str(uuid.uuid4()))
+            previous_song = title
+            current_song["song_session_id"] = session_id
+            log_expres_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
+            song_data_batch.append(current_song)
+
+        listeners_data = get_listeners_expres(session_id)
+        listeners_data["song_session_id"] = session_id
+        log_expres_event(
+            RADIO_NAME,
+            f"Zachytení poslucháči: {listeners_data.get('listeners', '?')}",
+            session_id
+        )
+        listeners_data_batch.append(listeners_data)
+
+        if time.time() - last_batch_time >= BATCH_TIME:
+            now = datetime.now(ZoneInfo("Europe/Bratislava"))
+            date_str = now.strftime("%d-%m-%Y")
+            timestamp = now.strftime("%d-%m-%YT%H-%M-%S")
+            song_path_local = f"{timestamp}_expres_song.json"
+            listeners_path_local = f"{timestamp}_expres_listeners.json"
+            song_path_r2 = f"bronze/EXPRES/song/{date_str}/{timestamp}.json"
+            listeners_path_r2 = f"bronze/EXPRES/listeners/{date_str}/{timestamp}.json"
+
+            save_json(song_data_batch, song_path_local)
+            save_json(listeners_data_batch, listeners_path_local)
+
+            upload_file(song_path_local, song_path_r2)
+            upload_file(listeners_path_local, listeners_path_r2)
+
+            log_expres_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_expres_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+
+            song_data_batch.clear()
+            listeners_data_batch.clear()
+            last_batch_time = time.time()
+
+        time.sleep(INTERVAL)
+
+
 def main():
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
     threading.Thread(target=funradio_worker, daemon=True).start()
+    threading.Thread(target=expres_worker, daemon=True).start()
     while True:
         time.sleep(60)
 
