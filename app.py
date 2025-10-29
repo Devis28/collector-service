@@ -22,7 +22,7 @@ from adapters.radio_funradio import (
 )
 from writer import upload_file
 
-INTERVAL = 30
+INTERVAL = 40
 BATCH_TIME = 600
 
 
