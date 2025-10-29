@@ -141,6 +141,8 @@ def rock_worker():
 
         time.sleep(INTERVAL)
 
+import time  # nezabudni načítať!
+
 def beta_worker():
     RADIO_NAME = "BETA"
     last_batch_time = time.time()
@@ -149,6 +151,14 @@ def beta_worker():
     previous_title = None
     previous_artist = None
     session_id = None
+
+    # WAIT UNTIL LISTENERS ARE NOT NONE
+    while True:
+        first = get_listeners_beta()
+        if first["listeners"] is not None:
+            break
+        print("[BETA] Čakám na prvé listeners dáta z websocketu...")
+        time.sleep(1)
 
     while True:
         current_song = get_song_beta()
@@ -163,7 +173,7 @@ def beta_worker():
             log_beta_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
             song_data_batch.append(current_song)
 
-        listeners_data = get_listeners_beta(session_id)
+        listeners_data = get_listeners_beta(session_id)  # už iba obyčajný call
         listeners_data["song_session_id"] = session_id
         log_beta_event(
             RADIO_NAME,
@@ -195,6 +205,7 @@ def beta_worker():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
+
 
 def main():
     start_beta_listeners_ws()
