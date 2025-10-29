@@ -36,6 +36,7 @@ from adapters.radio_expres import (
     log_radio_event as log_expres_event,
 )
 from writer import upload_file
+from adapters.radio_melody import flatten_song as flatten_melody_song, flatten_listener as flatten_melody_listener
 
 INTERVAL = 30
 BATCH_TIME = 7200
@@ -50,31 +51,33 @@ def melody_worker():
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
-    previous_title = None
-    previous_artist = None
+    previous_key = None
     session_id = None
 
     while True:
         current_song = get_song_melody()
-        title = current_song["data"].get("title")
-        artist = current_song["data"].get("artist")
+        # hra ideme podla raw
+        raw = current_song.get("raw", {})
+        title = raw.get("title")
+        artist = raw.get("artist")
+        key = (title, artist)
 
-        if title != previous_title or artist != previous_artist:
+        if previous_key != key:
             session_id = str(uuid.uuid4())
-            previous_title = title
-            previous_artist = artist
+            previous_key = key
             current_song["song_session_id"] = session_id
             log_melody_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
-            song_data_batch.append(current_song)
+            song_data_batch.append(flatten_melody_song(current_song))
 
-        listeners_data = asyncio.run(get_listeners_melody())
+        listeners_data = asyncio.run(get_listeners_melody(session_id))
         listeners_data["song_session_id"] = session_id
+        raw_list = listeners_data.get("raw", {})
         log_melody_event(
             RADIO_NAME,
-            f"Zachytení poslucháči: {listeners_data.get('data', {}).get('listeners', '?')}",
+            f"Zachytení poslucháči: {raw_list.get('listeners', '?')}",
             session_id
         )
-        listeners_data_batch.append(listeners_data)
+        listeners_data_batch.append(flatten_melody_listener(listeners_data))
 
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -99,7 +102,6 @@ def melody_worker():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
-
 
 def rock_worker():
     RADIO_NAME = "ROCK"
