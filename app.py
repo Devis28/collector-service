@@ -1,6 +1,5 @@
 import time
 import json
-import asyncio
 import uuid
 import threading
 from datetime import datetime
@@ -19,17 +18,16 @@ from adapters.radio_beta import (
     get_current_song as get_song_beta,
     get_current_listeners as get_listeners_beta,
     log_radio_event as log_beta_event,
+    start_beta_listeners_ws,
 )
 from writer import upload_file
 
 INTERVAL = 30
 BATCH_TIME = 600
 
-
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 def melody_worker():
     RADIO_NAME = "MELODY"
@@ -85,7 +83,6 @@ def melody_worker():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
-
 
 def rock_worker():
     RADIO_NAME = "ROCK"
@@ -151,6 +148,11 @@ def beta_worker():
     previous_artist = None
     session_id = None
 
+    # Čakaj na prvé listeners, inak bude None
+    while get_listeners_beta()["listeners"] is None:
+        print("[BETA] Čakám na listeners dáta z websocketu...")
+        time.sleep(1)
+
     while True:
         current_song = get_song_beta()
         title = current_song["data"].get("title")
@@ -198,12 +200,12 @@ def beta_worker():
         time.sleep(INTERVAL)
 
 def main():
+    start_beta_listeners_ws()
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
     threading.Thread(target=beta_worker, daemon=True).start()
     while True:
         time.sleep(60)
-
 
 if __name__ == "__main__":
     main()
