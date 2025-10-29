@@ -9,6 +9,11 @@ import uuid
 SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"
 LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"
 
+# Globálne premenné pre WebSocket spojenie
+websocket_connection = None
+last_listeners_data = None
+listeners_lock = asyncio.Lock()
+
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -63,48 +68,75 @@ def get_current_song():
         }
 
 
+async def maintain_websocket_connection():
+    """Udržiava WebSocket spojenie a prijíma správy"""
+    global websocket_connection, last_listeners_data
+
+    while True:
+        try:
+            async with websockets.connect(LISTENERS_WS) as ws:
+                websocket_connection = ws
+                log_radio_event("BETA", "WebSocket spojenie pre poslucháčov bolo úspešne nadviazané")
+
+                while True:
+                    try:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=30.0)
+                        data = json.loads(raw)
+
+                        if "listeners" in data:
+                            async with listeners_lock:
+                                last_listeners_data = {
+                                    "listeners": data["listeners"],
+                                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime(
+                                        "%d.%m.%Y %H:%M:%S"),
+                                    "raw_valid": True
+                                }
+                                log_radio_event("BETA", f"Prijaté nové dáta o poslucháčoch: {data['listeners']}")
+
+                    except asyncio.TimeoutError:
+                        # Timeout je normálny, pokračujeme v čakaní na ďalšiu správu
+                        continue
+                    except websockets.exceptions.ConnectionClosed:
+                        log_radio_event("BETA", "WebSocket spojenie bolo uzavreté, pokúšam sa znova...")
+                        break
+
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg:
+                log_radio_event("BETA", "HTTP 429 - Príliš veľa požiadaviek, čakám 60 sekúnd pred ďalším pokusom")
+                await asyncio.sleep(60)
+            else:
+                log_radio_event("BETA", f"Chyba pri pripájaní WebSocket: {e}, pokúšam sa znova o 30 sekúnd")
+                await asyncio.sleep(30)
+
+
 async def get_current_listeners(session_id=None):
-    uri = LISTENERS_WS
-    try:
-        async with websockets.connect(uri) as websocket:
-            # Čakáme na správu s timeoutom 20 sekúnd
-            try:
-                raw = await asyncio.wait_for(websocket.recv(), timeout=20.0)
-                data = json.loads(raw)
+    """Získa aktuálne dáta o poslucháčoch z globálneho spojenia"""
+    global last_listeners_data
 
-                if "listeners" in data:
-                    return {
-                        "listeners": data["listeners"],
-                        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                        "raw_valid": True,
-                        "song_session_id": session_id
-                    }
-                else:
-                    return {
-                        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                        "raw_valid": False,
-                        "song_session_id": session_id
-                    }
-
-            except asyncio.TimeoutError:
-                log_radio_event("BETA", "Timeout pri čakaní na listeners dáta", session_id)
-                return {
-                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                    "raw_valid": False,
-                    "song_session_id": session_id
-                }
-
-    except Exception as e:
-        log_radio_event("BETA", f"Chyba pri získavaní listeners: {e}", session_id)
+    # Ak máme uložené dáta, vrátime ich
+    if last_listeners_data:
         return {
+            **last_listeners_data,
+            "song_session_id": session_id
+        }
+    else:
+        # Ak ešte nemáme žiadne dáta
+        return {
+            "listeners": None,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": False,
             "song_session_id": session_id
         }
 
 
-# Funkcia pre spustenie WebSocket connection (pre kompatibilitu s app.py)
 def start_beta_listeners_ws():
-    # Pre Beta nie je potrebné udržiavať separátne WebSocket spojenie
-    # Každé volanie get_current_listeners vytvorí nové spojenie
-    pass
+    """Spustí udržiavanie WebSocket spojenia v pozadí"""
+
+    def run_websocket():
+        asyncio.run(maintain_websocket_connection())
+
+    import threading
+    thread = threading.Thread(target=run_websocket, daemon=True)
+    thread.start()
+    log_radio_event("BETA", "WebSocket worker bol spustený")
