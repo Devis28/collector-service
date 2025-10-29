@@ -41,21 +41,22 @@ def get_current_song():
         }
 
 async def get_current_listeners(session_id=None):
-    uri = "wss://rock-server.fly.dev/ws/push/listenership"
+    uri = LISTENERS_WS
     listeners_data = None
     async with websockets.connect(uri) as websocket:
         try:
             latest = None
-            # Slučka: 15 pokusov × 2s = max 30 sekúnd hľadania listeners value
-            for _ in range(15):
+            # 18 pokusov × 2.5s = max 45 sekúnd na listeners správu
+            for _ in range(18):
                 try:
-                    raw = await asyncio.wait_for(websocket.recv(), timeout=2)
+                    raw = await asyncio.wait_for(websocket.recv(), timeout=2.5)
                 except asyncio.TimeoutError:
                     continue
                 data = json.loads(raw)
-                # Ak správa obsahuje field "listeners", berieme ho
+                # Prijmi prvé "listeners" ktoré príde
                 if "listeners" in data:
                     latest = data["listeners"]
+                    break  # len prvé listeners v cykle, potom ukonči
             if latest is not None:
                 listeners_data = {
                     "listeners": latest,
@@ -76,4 +77,3 @@ async def get_current_listeners(session_id=None):
                 "song_session_id": session_id
             }
     return listeners_data
-
