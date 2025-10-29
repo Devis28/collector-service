@@ -198,6 +198,7 @@ def beta_worker():
 def main():
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
+    threading.Thread(target=beta_worker, daemon=True).start()
     while True:
         time.sleep(60)  # Main thread beží donekonečna, workers idú v backgrounde
 
