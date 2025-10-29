@@ -33,8 +33,7 @@ from adapters.radio_expres import (
 from writer import upload_file
 
 INTERVAL = 30
-BATCH_TIME = 600
-
+BATCH_TIME = 7200
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
