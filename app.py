@@ -149,7 +149,6 @@ def beta_worker():
     previous_artist = None
     session_id = None
 
-    # Po štarte čakaj na listeners, kým príde prvá skutočná hodnota
     while get_listeners_beta()["listeners"] is None:
         print("[BETA] Čakám na listeners dáta z websocketu...")
         time.sleep(1)

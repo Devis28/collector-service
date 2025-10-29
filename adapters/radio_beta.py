@@ -11,7 +11,7 @@ import uuid
 SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"
 LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"
 
-# Thread-safe shared cache
+# Cache a zámok na listeners hodnotu
 latest_beta_listeners = {"value": None, "timestamp": None}
 listeners_lock = threading.Lock()
 
@@ -61,6 +61,7 @@ def start_beta_listeners_ws():
                             continue
             except Exception:
                 time.sleep(5)
+
     threading.Thread(target=lambda: asyncio.run(ws_loop()), daemon=True).start()
 
 def get_current_listeners(session_id=None):
