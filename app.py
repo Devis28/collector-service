@@ -19,7 +19,6 @@ from adapters.radio_beta import (
     get_current_song as get_song_beta,
     get_current_listeners as get_listeners_beta,
     log_radio_event as log_beta_event,
-    start_beta_listeners_ws
 )
 from writer import upload_file
 
@@ -143,52 +142,35 @@ def rock_worker():
 
         time.sleep(INTERVAL)
 
-
 def beta_worker():
     RADIO_NAME = "BETA"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
     previous_title = None
-    previous_author = None
+    previous_artist = None
     session_id = None
 
     while True:
         current_song = get_song_beta()
-        song = current_song.get("song", {})
-        title = song.get("musicTitle")
-        author = song.get("musicAuthor")
+        title = current_song["data"].get("title")
+        artist = current_song["data"].get("artist")
 
-        if title != previous_title or author != previous_author:
+        if title != previous_title or artist != previous_artist:
             session_id = str(uuid.uuid4())
             previous_title = title
-            previous_author = author
+            previous_artist = artist
             current_song["song_session_id"] = session_id
-
-            if title and author:
-                log_beta_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
-            else:
-                log_beta_event(RADIO_NAME, "Rádio hrá reklamy alebo je ticho", session_id)
-
+            log_beta_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
             song_data_batch.append(current_song)
 
-        # Získanie poslucháčov - teraz bez vytvárania nového WebSocket spojenia
         listeners_data = asyncio.run(get_listeners_beta(session_id))
-
-        # Logovanie len ak máme platné dáta
-        if listeners_data.get('raw_valid') and listeners_data.get('listeners') is not None:
-            log_beta_event(
-                RADIO_NAME,
-                f"Zachytení poslucháči: {listeners_data.get('listeners')}",
-                session_id
-            )
-        else:
-            log_beta_event(
-                RADIO_NAME,
-                "Čakám na dáta o poslucháčoch...",
-                session_id
-            )
-
+        listeners_data["song_session_id"] = session_id
+        log_beta_event(
+            RADIO_NAME,
+            f"Zachytení poslucháči: {listeners_data.get('listeners', '?')}",
+            session_id
+        )
         listeners_data_batch.append(listeners_data)
 
         if time.time() - last_batch_time >= BATCH_TIME:
@@ -215,9 +197,7 @@ def beta_worker():
 
         time.sleep(INTERVAL)
 
-
 def main():
-    start_beta_listeners_ws()
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
     threading.Thread(target=beta_worker, daemon=True).start()
