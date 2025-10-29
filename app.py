@@ -32,7 +32,7 @@ from adapters.radio_expres import (
 )
 from writer import upload_file
 
-INTERVAL = 40
+INTERVAL = 30
 BATCH_TIME = 600
 
 
