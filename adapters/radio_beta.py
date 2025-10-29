@@ -71,15 +71,24 @@ async def try_get_listeners_once():
     global last_successful_listeners, last_listeners_update
 
     try:
-        async with websockets.connect(LISTENERS_WS, timeout=30) as websocket:
-            # Čakáme na jednu správu s veľkým timeoutom
-            raw = await asyncio.wait_for(websocket.recv(), timeout=60.0)
+        # Opravené: použijeme asyncio.wait_for pre celé pripojenie
+        async with websockets.connect(LISTENERS_WS) as websocket:
+            # Čakáme na jednu správu s timeoutom
+            raw = await asyncio.wait_for(websocket.recv(), timeout=30.0)
             data = json.loads(raw)
 
             if "listeners" in data:
                 last_successful_listeners = data["listeners"]
                 last_listeners_update = time_module.time()
+                log_radio_event("BETA", f"Úspešne získané dáta o poslucháčoch: {last_successful_listeners}")
                 return last_successful_listeners
+    except asyncio.TimeoutError:
+        log_radio_event("BETA", "Timeout pri čakaní na dáta o poslucháčoch")
+    except websockets.exceptions.InvalidStatusCode as e:
+        if e.status_code == 429:
+            log_radio_event("BETA", "HTTP 429 - Príliš veľa požiadaviek, skúste neskôr")
+        else:
+            log_radio_event("BETA", f"WebSocket chyba: {e}")
     except Exception as e:
         log_radio_event("BETA", f"Chyba pri jednorázovom pokuse o listeners: {e}")
 

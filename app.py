@@ -172,15 +172,22 @@ def beta_worker():
 
             song_data_batch.append(current_song)
 
-        # Získanie poslucháčov - pre Beta nemáme dáta kvôli obmedzeniam servera
+        # Získanie poslucháčov - s cache a obmedzeným prístupom
         listeners_data = asyncio.run(get_listeners_beta(session_id))
 
-        # Logovanie - informujeme, že dáta o poslucháčoch nie sú dostupné
-        log_beta_event(
-            RADIO_NAME,
-            "Dáta o poslucháčoch nie sú dostupné (obmedzenie servera)",
-            session_id
-        )
+        # Logovanie podľa dostupnosti dát
+        if listeners_data.get('raw_valid') and listeners_data.get('listeners') is not None:
+            log_beta_event(
+                RADIO_NAME,
+                f"Zachytení poslucháči: {listeners_data.get('listeners')}",
+                session_id
+            )
+        else:
+            log_beta_event(
+                RADIO_NAME,
+                "Dáta o poslucháčoch nie sú dostupné (obmedzenie servera)",
+                session_id
+            )
 
         listeners_data_batch.append(listeners_data)
 
@@ -207,7 +214,6 @@ def beta_worker():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
-
 
 def main():
     start_beta_listeners_ws()
