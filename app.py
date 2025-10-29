@@ -163,7 +163,7 @@ def beta_worker():
             log_beta_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
             song_data_batch.append(current_song)
 
-        listeners_data = asyncio.run(get_listeners_beta(session_id))
+        listeners_data = get_listeners_beta(session_id)
         listeners_data["song_session_id"] = session_id
         log_beta_event(
             RADIO_NAME,
