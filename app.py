@@ -19,6 +19,7 @@ from adapters.radio_beta import (
     get_current_song as get_song_beta,
     get_current_listeners as get_listeners_beta,
     log_radio_event as log_beta_event,
+    start_beta_listeners_ws,
 )
 from writer import upload_file
 
@@ -196,6 +197,7 @@ def beta_worker():
         time.sleep(INTERVAL)
 
 def main():
+    start_beta_listeners_ws()
     threading.Thread(target=melody_worker, daemon=True).start()
     threading.Thread(target=rock_worker, daemon=True).start()
     threading.Thread(target=beta_worker, daemon=True).start()

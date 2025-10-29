@@ -1,13 +1,18 @@
 import requests
 import websockets
+import threading
 import asyncio
 import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"  # nahraď reálnym endpointom
-LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"  # nahraď reálnym endpointom
+SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"
+LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"
+
+# Sdielaná cache pre poslednú hodnotu listeners (thread-safe)
+latest_beta_listeners = {"value": None, "recorded_at": None}
+listeners_lock = threading.Lock()
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -37,39 +42,36 @@ def get_current_song():
             "song_session_id": str(uuid.uuid4())
         }
 
-async def get_current_listeners(session_id=None):
-    uri = LISTENERS_WS
-    listeners_data = None
-    async with websockets.connect(uri) as websocket:
-        try:
-            latest = None
-            # 18 pokusov * 2.5s = max 45 sekúnd čakanie
-            for _ in range(18):
-                try:
-                    raw = await asyncio.wait_for(websocket.recv(), timeout=2.5)
-                except asyncio.TimeoutError:
-                    continue
-                data = json.loads(raw)
-                if "listeners" in data:
-                    latest = data["listeners"]
-                    break  # zachytí prvé listeners, ukončí cyklus
-            if latest is not None:
-                listeners_data = {
-                    "listeners": latest,
-                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                    "raw_valid": True,
-                    "song_session_id": session_id
-                }
-            else:
-                listeners_data = {
-                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                    "raw_valid": False,
-                    "song_session_id": session_id
-                }
-        except Exception:
-            listeners_data = {
-                "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                "raw_valid": False,
-                "song_session_id": session_id
-            }
-    return listeners_data
+def start_beta_listeners_ws():
+    async def ws_loop():
+        uri = LISTENERS_WS
+        while True:
+            try:
+                async with websockets.connect(uri) as websocket:
+                    while True:
+                        msg = await websocket.recv()
+                        try:
+                            data = json.loads(msg)
+                            if "listeners" in data:
+                                with listeners_lock:
+                                    latest_beta_listeners["value"] = data["listeners"]
+                                    latest_beta_listeners["recorded_at"] = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
+                        except Exception:
+                            continue
+            except Exception:
+                # Pri výpadku reconnect after short delay
+                time.sleep(5)
+
+    threading.Thread(target=lambda: asyncio.run(ws_loop()), daemon=True).start()
+
+def get_current_listeners(session_id=None):
+    # Návrat poslednej známej hodnoty z cache
+    with listeners_lock:
+        value = latest_beta_listeners["value"]
+        recorded_at = latest_beta_listeners["recorded_at"]
+    return {
+        "listeners": value,
+        "recorded_at": recorded_at if recorded_at else datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+        "raw_valid": value is not None,
+        "song_session_id": session_id
+    }
