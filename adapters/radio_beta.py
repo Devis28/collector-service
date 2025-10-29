@@ -1,9 +1,7 @@
 import requests
 import websockets
-import threading
 import asyncio
 import json
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
@@ -11,8 +9,6 @@ import uuid
 SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"
 LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"
 
-latest_beta_listeners = {"value": None, "timestamp": None}
-listeners_lock = threading.Lock()
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -20,56 +16,95 @@ def log_radio_event(radio_name, text, session_id=None):
     session_part = f" [{session_id}]" if session_id else ""
     print(f"[{timestamp}] [{radio_name}]{session_part} {text}")
 
+
 def get_current_song():
     try:
         r = requests.get(SONG_API)
         data = r.json()
-        title = data.get("title")
-        artist = data.get("artist")
-        raw_valid = title is not None and artist is not None
+
+        # Transformácia dát do formátu kompatibilného s app.py
+        if data.get("is_playing") == False:
+            # Rádio hrá reklamy alebo je ticho
+            transformed_data = {
+                "song": {
+                    "musicAuthor": None,
+                    "musicTitle": None,
+                    "radio": data.get("radio", "Beta"),
+                    "startTime": None
+                },
+                "last_update": data.get("timestamp"),
+                "raw_valid": True
+            }
+        else:
+            # Rádio hrá skladbu
+            transformed_data = {
+                "song": {
+                    "musicAuthor": data.get("interpreters"),
+                    "musicTitle": data.get("title"),
+                    "radio": data.get("radio", "Beta"),
+                    "startTime": data.get("start_time")
+                },
+                "last_update": data.get("timestamp"),
+                "raw_valid": True
+            }
+
         session_id = str(uuid.uuid4())
         return {
-            "data": data,
+            **transformed_data,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": raw_valid,
             "song_session_id": session_id
         }
-    except Exception:
+    except Exception as e:
+        log_radio_event("BETA", f"Chyba pri získavaní skladby: {e}")
         return {
-            "data": {},
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": False,
             "song_session_id": str(uuid.uuid4())
         }
 
-def start_beta_listeners_ws():
-    async def ws_loop():
-        uri = LISTENERS_WS
-        while True:
+
+async def get_current_listeners(session_id=None):
+    uri = LISTENERS_WS
+    try:
+        async with websockets.connect(uri) as websocket:
+            # Čakáme na správu s timeoutom 20 sekúnd
             try:
-                async with websockets.connect(uri) as websocket:
-                    while True:
-                        msg = await websocket.recv()
-                        try:
-                            data = json.loads(msg)
-                            if "listeners" in data:
-                                with listeners_lock:
-                                    latest_beta_listeners["value"] = data["listeners"]
-                                    latest_beta_listeners["timestamp"] = data.get("timestamp") or datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
-                        except Exception:
-                            continue
-            except Exception:
-                time.sleep(5)
+                raw = await asyncio.wait_for(websocket.recv(), timeout=20.0)
+                data = json.loads(raw)
 
-    threading.Thread(target=lambda: asyncio.run(ws_loop()), daemon=True).start()
+                if "listeners" in data:
+                    return {
+                        "listeners": data["listeners"],
+                        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                        "raw_valid": True,
+                        "song_session_id": session_id
+                    }
+                else:
+                    return {
+                        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                        "raw_valid": False,
+                        "song_session_id": session_id
+                    }
 
-def get_current_listeners(session_id=None):
-    with listeners_lock:
-        value = latest_beta_listeners["value"]
-        timestamp = latest_beta_listeners["timestamp"]
-    return {
-        "listeners": value,
-        "recorded_at": timestamp if timestamp else datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-        "raw_valid": value is not None,
-        "song_session_id": session_id
-    }
+            except asyncio.TimeoutError:
+                log_radio_event("BETA", "Timeout pri čakaní na listeners dáta", session_id)
+                return {
+                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                    "raw_valid": False,
+                    "song_session_id": session_id
+                }
+
+    except Exception as e:
+        log_radio_event("BETA", f"Chyba pri získavaní listeners: {e}", session_id)
+        return {
+            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+            "raw_valid": False,
+            "song_session_id": session_id
+        }
+
+
+# Funkcia pre spustenie WebSocket connection (pre kompatibilitu s app.py)
+def start_beta_listeners_ws():
+    # Pre Beta nie je potrebné udržiavať separátne WebSocket spojenie
+    # Každé volanie get_current_listeners vytvorí nové spojenie
+    pass

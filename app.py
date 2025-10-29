@@ -26,9 +26,11 @@ from writer import upload_file
 INTERVAL = 30
 BATCH_TIME = 600
 
+
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 def melody_worker():
     RADIO_NAME = "MELODY"
@@ -56,7 +58,7 @@ def melody_worker():
         listeners_data["song_session_id"] = session_id
         log_melody_event(
             RADIO_NAME,
-            f"Zachytení poslucháči: {listeners_data.get('data',{}).get('listeners', '?')}",
+            f"Zachytení poslucháči: {listeners_data.get('data', {}).get('listeners', '?')}",
             session_id
         )
         listeners_data_batch.append(listeners_data)
@@ -84,6 +86,7 @@ def melody_worker():
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
+
 
 def rock_worker():
     RADIO_NAME = "ROCK"
@@ -140,6 +143,7 @@ def rock_worker():
 
         time.sleep(INTERVAL)
 
+
 def beta_worker():
     RADIO_NAME = "BETA"
     last_batch_time = time.time()
@@ -160,7 +164,12 @@ def beta_worker():
             previous_title = title
             previous_author = author
             current_song["song_session_id"] = session_id
-            log_beta_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
+
+            if title and author:
+                log_beta_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
+            else:
+                log_beta_event(RADIO_NAME, "Rádio hrá reklamy alebo je ticho", session_id)
+
             song_data_batch.append(current_song)
 
         listeners_data = asyncio.run(get_listeners_beta(session_id))
@@ -186,14 +195,15 @@ def beta_worker():
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
 
-            log_rock_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_rock_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_beta_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_beta_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
 
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
 
         time.sleep(INTERVAL)
+
 
 def main():
     start_beta_listeners_ws()
@@ -202,6 +212,7 @@ def main():
     threading.Thread(target=beta_worker, daemon=True).start()
     while True:
         time.sleep(60)
+
 
 if __name__ == "__main__":
     main()
