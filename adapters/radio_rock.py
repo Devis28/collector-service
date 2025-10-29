@@ -33,7 +33,7 @@ def get_current_song():
             "raw_valid": raw_valid,
             "song_session_id": session_id
         }
-    except Exception as e:
+    except Exception:
         return {
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": False,
@@ -41,28 +41,41 @@ def get_current_song():
         }
 
 async def get_current_listeners(session_id=None):
-    listeners_data = None
     uri = LISTENERS_WS
+    listeners_data = None
     async with websockets.connect(uri) as websocket:
-        while True:
-            try:
-                msg = await asyncio.wait_for(websocket.recv(), timeout=10)
-                data = json.loads(msg)
+        try:
+            listeners_msg = None
+            for _ in range(10):  # 10 pokusov po 3 sekundy = max 30 sekúnd čakanie
+                try:
+                    raw = await asyncio.wait_for(websocket.recv(), timeout=3)
+                except asyncio.TimeoutError:
+                    continue
+                data = json.loads(raw)
                 if data.get("type") == "listeners_update":
-                    raw_valid = "listeners" in data and "last_update" in data
-                    listeners_data = {
-                        "listeners": data.get("listeners"),
-                        "last_update": data.get("last_update"),
-                        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                        "raw_valid": raw_valid,
-                        "song_session_id": session_id
-                    }
-                    break  # exit after first listeners_update
-            except Exception:
+                    listeners_msg = data
+                    break
+            if listeners_msg:
+                listeners = listeners_msg.get("listeners")
+                last_update = listeners_msg.get("last_update")
+                raw_valid = listeners is not None and last_update is not None
+                listeners_data = {
+                    "listeners": listeners,
+                    "last_update": last_update,
+                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                    "raw_valid": raw_valid,
+                    "song_session_id": session_id
+                }
+            else:
                 listeners_data = {
                     "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
                     "raw_valid": False,
                     "song_session_id": session_id
                 }
-                break
+        except Exception:
+            listeners_data = {
+                "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                "raw_valid": False,
+                "song_session_id": session_id
+            }
     return listeners_data
