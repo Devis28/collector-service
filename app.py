@@ -28,7 +28,9 @@ from adapters.radio_vlna import (
 from adapters.radio_beta import (
     get_current_song as get_song_beta,
     get_current_listeners as get_listeners_beta,
-    log_radio_event as log_beta_event
+    log_radio_event as log_beta_event,
+    flatten_song as flatten_beta_song,
+    flatten_listener as flatten_beta_listener,
 )
 from adapters.radio_expres import (
     get_current_song as get_song_expres,
@@ -279,9 +281,8 @@ def beta_worker():
     while True:
         current_song = get_song_beta()
         raw = current_song.get("raw", {})
-        # Ak hrá, extrahuj z raw záznamu identifikátory songu pre zmenu sklady
+        # Kľúč pre párovanie zmeny skladby a uskladnenie
         if raw.get("is_playing", True) is False:
-            # Idle stav - vždy sa zaznamenáva, každý nový idle je nová session
             song_key = (raw.get("radio"), raw.get("is_playing"), raw.get("timestamp"))
         else:
             song_key = (
@@ -297,17 +298,16 @@ def beta_worker():
             current_song["song_session_id"] = session_id
 
             if raw.get("is_playing", True):
-                song_title = raw.get("title", "")
-                song_interpreters = raw.get("interpreters", "")
-                msg = f"Zachytená skladba: {song_title} | {song_interpreters}"
+                msg = f"Zachytená skladba: {raw.get('title', '')} | {raw.get('interpreters', '')}"
             else:
                 msg = f"Nothing is playing"
+
             log_beta_event(
                 RADIO_NAME,
                 msg,
                 session_id,
             )
-            song_data_batch.append(current_song)
+            song_data_batch.append(flatten_beta_song(current_song))  # <- zapis plochy dict
 
         listeners_data = asyncio.run(get_listeners_beta(session_id))
         listeners_data["song_session_id"] = session_id
@@ -317,7 +317,7 @@ def beta_worker():
             f"Zachytení poslucháči: {raw_list.get('listeners', '?')}",
             session_id,
         )
-        listeners_data_batch.append(listeners_data)
+        listeners_data_batch.append(flatten_beta_listener(listeners_data))  # <- zapis plochy dict
 
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))

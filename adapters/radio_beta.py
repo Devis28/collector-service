@@ -10,7 +10,6 @@ import time as time_module
 SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"
 LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"
 
-# Globálna cache
 last_successful_listeners = None
 last_listeners_update = 0
 LAST_RAW_LISTENERS = None
@@ -20,20 +19,21 @@ LISTENERS_CACHE_TIME = 300  # 5 minút
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
+    radio_fmt = f"{radio_name:<7}"
     session_part = f" [{session_id}]" if session_id else ""
-    print(f"[{timestamp}] [{radio_name}]\t{session_part} {text}")
+    print(f"[{timestamp}] [{radio_fmt}]{session_part}\t{text}")
 
 def is_valid_song(data):
-    keys = set(data.keys())
     wanted = {"radio", "interpreters", "title", "start_time", "timestamp"}
-    # Neprekladaj is_playing alebo message! Len keď sú všetky atribúty, je valid.
-    return (isinstance(data, dict)
-            and wanted <= keys
-            and len(keys - wanted) == 0
-            and all(k in data and data[k] is not None for k in wanted))
+    # valid len ak presne tieto
+    return (
+        isinstance(data, dict)
+        and set(data.keys()) == wanted
+        and all(data[k] is not None for k in wanted)
+    )
 
 def is_valid_song_idle(data):
-    # "idle"/"not playing" song ({...is_playing: False})
+    # "idle"/"not playing" song
     return (
         isinstance(data, dict)
         and data.get("is_playing") is False
@@ -44,16 +44,16 @@ def is_valid_song_idle(data):
     )
 
 def is_valid_listeners(data):
-    keys = set(data.keys())
     return (
         isinstance(data, dict)
-        and keys == {"listeners", "timestamp"}
+        and set(data.keys()) == {"listeners", "timestamp"}
         and isinstance(data["listeners"], int)
         and isinstance(data["timestamp"], str)
     )
 
 def flatten_song(song_obj):
     raw = song_obj.get("raw", {})
+    # Rozbalí všetky kľúče z raw priamo do flat dict:
     flat = dict(raw)
     flat["recorded_at"] = song_obj["recorded_at"]
     flat["raw_valid"] = song_obj["raw_valid"]
@@ -62,6 +62,7 @@ def flatten_song(song_obj):
 
 def flatten_listener(listener_obj):
     raw = listener_obj.get("raw", {})
+    # Rozbalí všetky kľúče z raw do flat dict:
     flat = dict(raw)
     flat["recorded_at"] = listener_obj["recorded_at"]
     flat["raw_valid"] = listener_obj["raw_valid"]
@@ -83,7 +84,6 @@ def get_current_song():
                 "song_session_id": session_id
             }
         elif is_valid_song_idle(data):
-            # Aj idle song ukladáme, ale raw_valid len pre idle štruktúru
             return {
                 "raw": data,
                 "recorded_at": rec_at,
@@ -91,7 +91,6 @@ def get_current_song():
                 "song_session_id": session_id
             }
         else:
-            # Nefunguje žiadne z vyššie uvedených
             return {
                 "raw": data,
                 "recorded_at": rec_at,
@@ -114,7 +113,6 @@ async def try_get_listeners_once():
             raw = await asyncio.wait_for(websocket.recv(), timeout=30.0)
             data = json.loads(raw)
             raw_valid = is_valid_listeners(data)
-
             LAST_RAW_LISTENERS = data
             LAST_RAW_LISTENERS_TS = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
 
@@ -133,7 +131,6 @@ async def get_current_listeners(session_id=None):
     global last_successful_listeners, last_listeners_update, LAST_RAW_LISTENERS, LAST_RAW_LISTENERS_TS
     current_time = time_module.time()
 
-    # Cachenutie posledného validného raw payloadu
     if (
         LAST_RAW_LISTENERS is not None
         and (current_time - last_listeners_update < LISTENERS_CACHE_TIME)
@@ -157,7 +154,6 @@ async def get_current_listeners(session_id=None):
             "song_session_id": session_id
         }
 
-    # fallback, nemáme nič
     return {
         "raw": {},
         "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),

@@ -23,12 +23,20 @@ def log_radio_event(radio_name, text, session_id=None):
     print(f"[{timestamp}] [{radio_name}]\t{session_part} {text}")
 
 def is_valid_song(data):
+    # platí iba ak presne tieto a žiadne iné kľúče!
     return (
         isinstance(data, dict)
-        and "song" in data
-        and "artist" in data
-        and "start_time" in data
+        and set(data.keys()) == {"song", "artist", "start_time"}
+        and all(data[k] is not None for k in ["song", "artist", "start_time"])
     )
+
+def flatten_song(song_obj):
+    raw = song_obj.get("raw", {})
+    flat = dict(raw)
+    flat["recorded_at"] = song_obj["recorded_at"]
+    flat["raw_valid"] = song_obj["raw_valid"]
+    flat["song_session_id"] = song_obj["song_session_id"]
+    return flat
 
 def get_current_song():
     try:
@@ -37,7 +45,7 @@ def get_current_song():
         raw_valid = is_valid_song(data)
         session_id = str(uuid.uuid4())
         return {
-            "raw": data,  # uschovaj celé RAW
+            "raw": data,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": raw_valid,
             "song_session_id": session_id
@@ -45,7 +53,7 @@ def get_current_song():
     except Exception as e:
         log_radio_event("VLNA", f"Chyba pri získavaní skladby: {e}")
         return {
-            "raw": {},  # nie je čo uložiť
+            "raw": {},
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": False,
             "song_session_id": str(uuid.uuid4())
@@ -54,9 +62,18 @@ def get_current_song():
 def is_valid_listeners(data):
     return (
         isinstance(data, dict)
-        and "listeners" in data
-        and "timestamp" in data
+        and set(data.keys()) == {"listeners", "timestamp"}
+        and isinstance(data["listeners"], int)
+        and isinstance(data["timestamp"], str)
     )
+
+def flatten_listener(listener_obj):
+    raw = listener_obj.get("raw", {})
+    flat = dict(raw)
+    flat["recorded_at"] = listener_obj["recorded_at"]
+    flat["raw_valid"] = listener_obj["raw_valid"]
+    flat["song_session_id"] = listener_obj["song_session_id"]
+    return flat
 
 async def try_get_listeners_once():
     global last_successful_listeners, last_listeners_update, LAST_RAW_LISTENERS, LAST_RAW_LISTENERS_TS
@@ -65,7 +82,6 @@ async def try_get_listeners_once():
             raw = await asyncio.wait_for(websocket.recv(), timeout=30.0)
             data = json.loads(raw)
             raw_valid = is_valid_listeners(data)
-
             LAST_RAW_LISTENERS = data
             LAST_RAW_LISTENERS_TS = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
 
@@ -73,20 +89,18 @@ async def try_get_listeners_once():
                 last_successful_listeners = data["listeners"]
                 last_listeners_update = time_module.time()
                 log_radio_event("VLNA", f"Úspešne získané dáta o poslucháčoch: {last_successful_listeners}")
-                return data  # vraciame celé RAW
             else:
                 log_radio_event("VLNA", f"Nesprávna štruktúra listeners {[k for k in data]}")
-                return data
+            return data
     except Exception as e:
         log_radio_event("VLNA", f"Chyba pri pokuse o listeners: {e}")
 
-    return {}  # ak žiadne dáta
+    return {}
 
 async def get_current_listeners(session_id=None):
     global last_successful_listeners, last_listeners_update, LAST_RAW_LISTENERS, LAST_RAW_LISTENERS_TS
     current_time = time_module.time()
 
-    # cache pre listeners
     if (
         LAST_RAW_LISTENERS is not None
         and (current_time - last_listeners_update < LISTENERS_CACHE_TIME)
@@ -110,7 +124,6 @@ async def get_current_listeners(session_id=None):
             "song_session_id": session_id
         }
 
-    # fallback, keď nie je nič
     return {
         "raw": {},
         "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
