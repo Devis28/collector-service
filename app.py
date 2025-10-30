@@ -66,7 +66,7 @@ def melody_worker():
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_melody_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
+            log_melody_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_melody_song(current_song))
 
         listeners_data = asyncio.run(get_listeners_melody(session_id))
@@ -123,7 +123,7 @@ def rock_worker():
             previous_title = title
             previous_author = author
             current_song["song_session_id"] = session_id
-            log_rock_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
+            log_rock_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(current_song)
 
         listeners_data = asyncio.run(get_listeners_rock(session_id))
@@ -178,7 +178,7 @@ def funradio_worker():
             previous_title = title
             previous_author = author
             current_song["song_session_id"] = session_id
-            log_funradio_event(RADIO_NAME, f"Zachytená skladba: {title} / {author}", session_id)
+            log_funradio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(current_song)
 
         listeners_data = asyncio.run(get_listeners_funradio(session_id))
@@ -231,7 +231,7 @@ def vlna_worker():
             session_id = str(uuid.uuid4())
             last_song = (title, artist)
             current_song["song_session_id"] = session_id
-            log_vlna_event(RADIO_NAME, f"Zachytená skladba: {title}", session_id)
+            log_vlna_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(current_song)
 
         listeners_data = asyncio.run(get_listeners_vlna(session_id))
@@ -297,7 +297,7 @@ def beta_worker():
             current_song["song_session_id"] = session_id
             log_beta_event(
                 RADIO_NAME,
-                f"Zachytená skladba: {raw.get('title')}" if raw.get("is_playing", True) else "Nothing is playing",
+                f"Zachytená skladba: {raw.get('title') | raw.get('interpreters')}" if raw.get("is_playing", True) else "Nothing is playing",
                 session_id,
             )
             song_data_batch.append(current_song)
@@ -357,7 +357,7 @@ def expres_worker():
             session_id = current_song.get("song_session_id", str(uuid.uuid4()))
             previous_song = current_song_identifier
             current_song["song_session_id"] = session_id
-            log_expres_event(RADIO_NAME, f"Zachytená skladba: {title} - {artist}", session_id)
+            log_expres_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(current_song)
 
         # Získanie poslucháčov - SYNCHRONNE, nie asynchrónne!
