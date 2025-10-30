@@ -297,7 +297,7 @@ def beta_worker():
             current_song["song_session_id"] = session_id
             log_beta_event(
                 RADIO_NAME,
-                f"Zachytená skladba: {raw.get('title') | raw.get('interpreters')}" if raw.get("is_playing", True) else "Nothing is playing",
+                f"Zachytená skladba: {raw.get('title', 'interpreters')}" if raw.get("is_playing", True) else "Nothing is playing",
                 session_id,
             )
             song_data_batch.append(current_song)
