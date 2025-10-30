@@ -85,12 +85,6 @@ async def try_get_listeners_once():
             LAST_RAW_LISTENERS = data
             LAST_RAW_LISTENERS_TS = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
 
-            if raw_valid:
-                last_successful_listeners = data["listeners"]
-                last_listeners_update = time_module.time()
-                log_radio_event("VLNA", f"Úspešne získané dáta o poslucháčoch: {last_successful_listeners}")
-            else:
-                log_radio_event("VLNA", f"Nesprávna štruktúra listeners {[k for k in data]}")
             return data
     except Exception as e:
         log_radio_event("VLNA", f"Chyba pri pokuse o listeners: {e}")
