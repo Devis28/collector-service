@@ -101,7 +101,7 @@ def get_current_listeners(session_id=None):
 def start_expres_webhook():
     def run_flask():
         log_radio_event("EXPRES", "Spúštam Flask webhook server na porte 5001")
-        app.run(host='0.0.0.0', port=8001, debug=False)
+        app.run(host='0.0.0.0', port=8000, debug=False)
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
