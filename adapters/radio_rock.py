@@ -46,17 +46,16 @@ async def get_current_listeners(session_id=None):
     async with websockets.connect(uri) as websocket:
         try:
             latest = None
-            # 18 pokusov × 2.5s = max 45 sekúnd na listeners správu
-            for _ in range(18):
+            # Najviac 3 pokusy × 10 sek = max 30 sekúnd na listeners správu
+            for _ in range(3):
                 try:
-                    raw = await asyncio.wait_for(websocket.recv(), timeout=2.5)
+                    raw = await asyncio.wait_for(websocket.recv(), timeout=10)
                 except asyncio.TimeoutError:
                     continue
                 data = json.loads(raw)
-                # Prijmi prvé "listeners" ktoré príde
                 if "listeners" in data:
                     latest = data["listeners"]
-                    break  # len prvé listeners v cykle, potom ukonči
+                    break
             if latest is not None:
                 listeners_data = {
                     "listeners": latest,
@@ -77,3 +76,4 @@ async def get_current_listeners(session_id=None):
                 "song_session_id": session_id
             }
     return listeners_data
+
