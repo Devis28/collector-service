@@ -38,7 +38,7 @@ from adapters.radio_expres import (
 from writer import upload_file
 from adapters.radio_melody import flatten_song as flatten_melody_song, flatten_listener as flatten_melody_listener
 
-INTERVAL = 30
+INTERVAL = 40
 BATCH_TIME = 7200
 
 def save_json(data, path):
