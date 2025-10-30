@@ -34,7 +34,7 @@ def expres_webhook():
     latest_song = entry
     with open(SONG_FILE, "w", encoding="utf-8") as f:
         json.dump(entry, f, ensure_ascii=False, indent=2)
-    log_radio_event("EXPRES", f"Prijatý webhook song: {data.get('song')}", session_id)
+    log_radio_event("EXPRES", f"Prijatý webhook song: {data.get('song')} | {data.get('artists')}", session_id)
     return "OK"
 
 
