@@ -19,9 +19,9 @@ LISTENERS_CACHE_TIME = 300  # 5 minút
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    radio_fmt = f"{radio_name:\t}"
+    radio_fmt = f"{radio_name:}"
     session_part = f" [{session_id}]" if session_id else ""
-    print(f"[{timestamp}] [{radio_fmt}]{session_part}\t{text}")
+    print(f"[{timestamp}] [{radio_fmt}]\t{session_part}\t{text}")
 
 def is_valid_song(data):
     wanted = {"radio", "interpreters", "title", "start_time", "timestamp"}
