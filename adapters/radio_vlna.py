@@ -32,7 +32,9 @@ def is_valid_song(data):
 
 def flatten_song(song_obj):
     raw = song_obj.get("raw", {})
-    flat = dict(raw)
+    flat = {}
+    # rozbalíme atribúty priamo do flat dict
+    flat.update(raw)
     flat["recorded_at"] = song_obj["recorded_at"]
     flat["raw_valid"] = song_obj["raw_valid"]
     flat["song_session_id"] = song_obj["song_session_id"]
@@ -69,7 +71,8 @@ def is_valid_listeners(data):
 
 def flatten_listener(listener_obj):
     raw = listener_obj.get("raw", {})
-    flat = dict(raw)
+    flat = {}
+    flat.update(raw)
     flat["recorded_at"] = listener_obj["recorded_at"]
     flat["raw_valid"] = listener_obj["raw_valid"]
     flat["song_session_id"] = listener_obj["song_session_id"]
