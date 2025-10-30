@@ -19,7 +19,7 @@ LISTENERS_CACHE_TIME = 300  # 5 minút
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    radio_fmt = f"{radio_name:<7}"
+    radio_fmt = f"{radio_name:}"
     session_part = f" [{session_id}]" if session_id else ""
     print(f"[{timestamp}] [{radio_fmt}]{session_part}\t{text}")
 
