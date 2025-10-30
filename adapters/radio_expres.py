@@ -56,7 +56,7 @@ def get_current_song():
 def get_current_listeners(session_id=None):
     try:
         log_radio_event("EXPRES", f"Pokúšam sa pripojiť na: {LISTENERS_API}", session_id)
-        r = requests.get(LISTENERS_API, timeout=10)
+        r = requests.get(LISTENERS_API, timeout=30)
         log_radio_event("EXPRES", f"HTTP status: {r.status_code}", session_id)
 
         if r.status_code == 200:
