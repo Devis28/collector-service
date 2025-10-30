@@ -65,7 +65,7 @@ async def get_current_listeners(session_id=None):
     listeners_data = {}
     session = await websockets.connect(LISTENERS_WS)
     try:
-        msg = await asyncio.wait_for(session.recv(), timeout=15)
+        msg = await asyncio.wait_for(session.recv(), timeout=20)
         data = json.loads(msg)
         raw_valid = is_valid_listeners(data)
         listeners_data = {
