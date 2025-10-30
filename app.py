@@ -295,9 +295,16 @@ def beta_worker():
             session_id = str(uuid.uuid4())
             last_song_data = song_key
             current_song["song_session_id"] = session_id
+
+            if raw.get("is_playing", True):
+                song_title = raw.get("title", "")
+                song_interpreters = raw.get("interpreters", "")
+                msg = f"Zachytená skladba: {song_title} / {song_interpreters}"
+            else:
+                msg = f"Nothing is playing"
             log_beta_event(
                 RADIO_NAME,
-                f"Zachytená skladba: {raw.get('title', 'interpreters')}" if raw.get("is_playing", True) else "Nothing is playing",
+                msg,
                 session_id,
             )
             song_data_batch.append(current_song)
