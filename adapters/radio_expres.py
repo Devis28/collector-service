@@ -62,18 +62,29 @@ def get_current_listeners(session_id=None):
         if r.status_code == 200:
             data = r.json()
             log_radio_event("EXPRES", f"Odpoveď API: {data}", session_id)
-            count = data.get("listeners")
 
-            if count is not None:
+            # VALIDÁCIA LEN PRESNE NA POŽADOVANÉ KLÚČE
+            wanted = {"listeners", "timestamp", "radio"}
+            raw_valid = (set(data.keys()) == wanted
+                         and isinstance(data["listeners"], int)
+                         and isinstance(data["timestamp"], str)
+                         and isinstance(data["radio"], str)
+                         and data["listeners"] is not None
+                         and data["timestamp"] is not None
+                         and data["radio"] is not None)
+
+            if raw_valid:
                 return {
-                    "listeners": count,
+                    "listeners": data["listeners"],
+                    "timestamp": data["timestamp"],
+                    "radio": data["radio"],
                     "recorded_at": data.get("timestamp") or datetime.now(ZoneInfo("Europe/Bratislava")).strftime(
                         "%d.%m.%Y %H:%M:%S"),
                     "raw_valid": True,
                     "song_session_id": session_id
                 }
             else:
-                log_radio_event("EXPRES", "API nevrátilo 'listeners' pole", session_id)
+                log_radio_event("EXPRES", f"API listeners payload invalid: {data}", session_id)
         else:
             log_radio_event("EXPRES", f"Chybný HTTP status: {r.status_code}", session_id)
 
@@ -88,14 +99,15 @@ def get_current_listeners(session_id=None):
     except Exception as e:
         log_radio_event("EXPRES", f"Neočakávaná chyba: {e}", session_id)
 
-    # Fallback - vráti None ak sa nepodarí získať dáta
+    # Fallback
     return {
         "listeners": None,
+        "timestamp": None,
+        "radio": None,
         "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
         "raw_valid": False,
         "song_session_id": session_id
     }
-
 
 # Spustenie Flask servera v samostatnom threade
 def start_expres_webhook():
