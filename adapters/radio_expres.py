@@ -12,31 +12,32 @@ LISTENERS_API = "http://147.232.205.56:5010/api/current_listeners"
 app = Flask(__name__)
 latest_song = {"data": {}, "timestamp": None, "raw_valid": False, "song_session_id": None}
 
-
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
     session_part = f" [{session_id}]" if session_id else ""
     print(f"[{timestamp}] [{radio_name}]\t{session_part} {text}")
 
-
 @app.route("/expres_webhook", methods=["POST"])
 def expres_webhook():
-    data = request.json
+    raw = request.json
     session_id = str(uuid.uuid4())
     entry = {
-        "data": data,
+        "song": raw.get("song"),
+        "artists": raw.get("artists", []),
+        "isrc": raw.get("isrc"),
+        "start_time": raw.get("start_time"),
+        "radio": raw.get("radio"),
         "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-        "raw_valid": set(data) >= {"song", "artists", "isrc", "start_time", "radio"},
+        "raw_valid": set(raw.keys()) >= {"song", "artists", "isrc", "start_time", "radio"},
         "song_session_id": session_id
     }
     global latest_song
     latest_song = entry
     with open(SONG_FILE, "w", encoding="utf-8") as f:
         json.dump(entry, f, ensure_ascii=False, indent=2)
-    log_radio_event("EXPRES", f"Prijatý webhook song: {data.get('song')} | {data.get('artists')}", session_id)
+    log_radio_event("EXPRES", f"Prijatý webhook song: {raw.get('song')} | {raw.get('artists')}", session_id)
     return "OK"
-
 
 def get_current_song():
     try:
@@ -46,7 +47,11 @@ def get_current_song():
     except Exception as e:
         log_radio_event("EXPRES", f"Chyba pri čítaní súboru so skladbou: {e}")
         return {
-            "data": {},
+            "song": None,
+            "artists": [],
+            "isrc": None,
+            "start_time": None,
+            "radio": None,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": False,
             "song_session_id": str(uuid.uuid4())
