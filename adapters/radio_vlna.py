@@ -14,7 +14,7 @@ last_successful_listeners = None
 last_listeners_update = 0
 LAST_RAW_LISTENERS = None
 LAST_RAW_LISTENERS_TS = None
-LISTENERS_CACHE_TIME = 300  # 5 minút
+LISTENERS_CACHE_TIME = 30  # 5 minút
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
