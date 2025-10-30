@@ -305,17 +305,16 @@ def expres_worker():
     previous_song = None
     session_id = None
     while True:
-        current_song = get_song_expres()
-        song = current_song["data"]
+        song = get_song_expres()
         title = song.get("song")
         artist = ", ".join(song.get("artists", []))
         current_song_identifier = f"{title}_{artist}"
         if title and (current_song_identifier != previous_song):
-            session_id = current_song.get("song_session_id", str(uuid.uuid4()))
+            session_id = song.get("song_session_id", str(uuid.uuid4()))
             previous_song = current_song_identifier
-            current_song["song_session_id"] = session_id
+            song["song_session_id"] = session_id
             log_expres_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
-            song_data_batch.append(current_song)
+            song_data_batch.append(song)
         listeners_data = get_listeners_expres(session_id)
         if listeners_data.get('raw_valid') and listeners_data.get('listeners') is not None:
             log_expres_event(
