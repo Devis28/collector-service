@@ -48,21 +48,15 @@ INTERVAL = 40
 INTERVAL_VLNA = 60
 BATCH_TIME = 600
 
-RADIO_NAMES = ["MELODY", "ROCK", "FUNRADIO", "VLNA", "BETA", "EXPRES"]
-RADIO_PAD = max(len(r) for r in RADIO_NAMES)
-
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    radio_fmt = f"{radio_name:<{RADIO_PAD}}"
-    bracket = f"[{radio_fmt}]"
-    session_part = f"[{session_id}]" if session_id else ""
-    # Text začína vždy na 40. znaku (prípadne uprav podľa šírky, ak by ti málo/veľa)
-    prefix = f"[{timestamp}] {bracket}"
-    if session_part:
-        prefix += f" {session_part}"
-    gap = max(1, 40 - len(prefix))
-    msg = prefix + " " * gap + text
+    prefix = f"[{timestamp}] [{radio_name}]"
+    if session_id:
+        prefix += f" [{session_id}]"
+    # Nastav na ktorom stĺpci má začať správa (tu 40, uprav podľa konzoly)
+    target_col = 40
+    msg = prefix.ljust(target_col) + text
     print(msg)
 
 def save_json(data, path):
