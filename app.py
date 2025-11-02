@@ -48,12 +48,22 @@ INTERVAL = 40
 INTERVAL_VLNA = 60
 BATCH_TIME = 600
 
+RADIO_NAMES = ["MELODY", "ROCK", "FUNRADIO", "VLNA", "BETA", "EXPRES"]
+RADIO_PAD = max(len(r) for r in RADIO_NAMES)
+
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    radio_fmt = f"{radio_name:<10}"
-    session_part = f" [{session_id}]" if session_id else ""
-    print(f"[{timestamp}] [{radio_fmt}]{session_part}\t{text}")
+    radio_fmt = f"{radio_name:<{RADIO_PAD}}"
+    bracket = f"[{radio_fmt}]"
+    session_part = f"[{session_id}]" if session_id else ""
+    # Text začína vždy na 40. znaku (prípadne uprav podľa šírky, ak by ti málo/veľa)
+    prefix = f"[{timestamp}] {bracket}"
+    if session_part:
+        prefix += f" {session_part}"
+    gap = max(1, 40 - len(prefix))
+    msg = prefix + " " * gap + text
+    print(msg)
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
@@ -72,7 +82,6 @@ def melody_worker():
         title = raw.get("title")
         artist = raw.get("artist")
         key = (title, artist)
-
         if not current_song["raw_valid"]:
             log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         if previous_key != key:
@@ -83,7 +92,6 @@ def melody_worker():
             song_data_batch.append(flatten_melody_song(current_song))
         else:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}", session_id)
-
         listeners_data = asyncio.run(get_listeners_melody(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
@@ -122,7 +130,6 @@ def rock_worker():
         title = song_info.get("musicTitle")
         author = song_info.get("musicAuthor")
         key = (title, author)
-
         if not current_song["raw_valid"]:
             log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         if previous_key != key and current_song["raw_valid"]:
@@ -133,7 +140,6 @@ def rock_worker():
             song_data_batch.append(flatten_rock_song(current_song))
         else:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}", session_id)
-
         listeners_data = asyncio.run(get_listeners_rock(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
@@ -173,7 +179,6 @@ def funradio_worker():
         song = current_song["raw"].get("song", {}) if isinstance(current_song.get("raw"), dict) else {}
         title = song.get("musicTitle")
         author = song.get("musicAuthor")
-
         if not current_song["raw_valid"]:
             log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {song}", session_id)
         elif (previous_title != title or previous_author != author) and title and author:
@@ -185,7 +190,6 @@ def funradio_worker():
             song_data_batch.append(flatten_funradio_song(current_song))
         elif title and author:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}", session_id)
-
         listeners_data = asyncio.run(get_listeners_funradio(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
@@ -193,7 +197,6 @@ def funradio_worker():
             log_radio_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
         log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_funradio_listener(listeners_data))
-
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
             date_str = now.strftime("%d-%m-%Y")
@@ -234,7 +237,6 @@ def vlna_worker():
             current_song["song_session_id"] = session_id
             log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_vlna_song(current_song))
-
         listeners_data = asyncio.run(get_listeners_vlna(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
@@ -272,14 +274,12 @@ def beta_worker():
     while True:
         current_song = get_song_beta()
         raw = current_song.get("raw", {})
-
         if raw.get("is_playing", True):
             title = raw.get("title")
             interpreters = raw.get("interpreters")
         else:
             title = None
             interpreters = None
-
         if not current_song["raw_valid"]:
             log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         elif (title != previous_title or interpreters != previous_interpreters) and title and interpreters:
@@ -291,17 +291,12 @@ def beta_worker():
             song_data_batch.append(flatten_beta_song(current_song))
         elif title and interpreters:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {interpreters}", session_id)
-
         listeners_data = asyncio.run(get_listeners_beta(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
             log_radio_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
-        log_radio_event(
-            RADIO_NAME,
-            f"Zachytení poslucháči: {raw_list.get('listeners', '?')}",
-            session_id,
-        )
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_beta_listener(listeners_data))
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -344,7 +339,6 @@ def expres_worker():
             song_data_batch.append(flatten_expres_song(song))
         else:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}", session_id)
-
         listeners_data = get_listeners_expres(session_id)
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
