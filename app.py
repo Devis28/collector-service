@@ -45,8 +45,8 @@ from adapters.radio_expres import (
 )
 
 INTERVAL = 40
-INTERVAL_VLNA = 60
-BATCH_TIME = 600
+INTERVAL_VLNA = 40
+BATCH_TIME = 7200
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
