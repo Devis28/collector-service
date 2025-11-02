@@ -5,27 +5,20 @@ import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
-import time as time_module
 
 SONG_API = "https://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/now-playing"
 LISTENERS_WS = "wss://radio-beta-generator-stable-czarcpe4f0bee5h7.polandcentral-01.azurewebsites.net/listeners"
-
-last_successful_listeners = None
-last_listeners_update = 0
-LAST_RAW_LISTENERS = None
-LAST_RAW_LISTENERS_TS = None
-LISTENERS_CACHE_TIME = 30  # 5 minút
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
     radio_fmt = f"{radio_name:}"
     session_part = f" [{session_id}]" if session_id else ""
-    print(f"[{timestamp}] [{radio_fmt}]\t{session_part} {text}")
+    print(f"[{timestamp}] [{radio_fmt}]{session_part} {text}")
 
 def is_valid_song(data):
     wanted = {"radio", "interpreters", "title", "start_time", "timestamp"}
-    # valid len ak presne tieto
+    # valid len ak presne tieto (playing case)
     return (
         isinstance(data, dict)
         and set(data.keys()) == wanted
@@ -33,17 +26,17 @@ def is_valid_song(data):
     )
 
 def is_valid_song_idle(data):
-    # "idle"/"not playing" song
+    # valid len ak presne: radio, is_playing, message, timestamp (not playing case)
+    wanted = {"radio", "is_playing", "message", "timestamp"}
     return (
         isinstance(data, dict)
+        and set(data.keys()) == wanted
         and data.get("is_playing") is False
-        and "message" in data
-        and "radio" in data
-        and "timestamp" in data
-        and len(data.keys()) == 4
+        and all(k in data for k in wanted)
     )
 
 def is_valid_listeners(data):
+    # valid len ak presne: listeners, timestamp
     return (
         isinstance(data, dict)
         and set(data.keys()) == {"listeners", "timestamp"}
@@ -53,7 +46,6 @@ def is_valid_listeners(data):
 
 def flatten_song(song_obj):
     raw = song_obj.get("raw", {})
-    # Rozbalí všetky kľúče z raw priamo do flat dict:
     flat = dict(raw)
     flat["recorded_at"] = song_obj["recorded_at"]
     flat["raw_valid"] = song_obj["raw_valid"]
@@ -62,7 +54,6 @@ def flatten_song(song_obj):
 
 def flatten_listener(listener_obj):
     raw = listener_obj.get("raw", {})
-    # Rozbalí všetky kľúče z raw do flat dict:
     flat = dict(raw)
     flat["recorded_at"] = listener_obj["recorded_at"]
     flat["raw_valid"] = listener_obj["raw_valid"]
@@ -71,11 +62,10 @@ def flatten_listener(listener_obj):
 
 def get_current_song():
     try:
-        r = requests.get(SONG_API)
+        r = requests.get(SONG_API, timeout=10)
         data = r.json()
         session_id = str(uuid.uuid4())
         rec_at = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
-
         if is_valid_song(data):
             return {
                 "raw": data,
@@ -91,6 +81,7 @@ def get_current_song():
                 "song_session_id": session_id
             }
         else:
+            log_radio_event("BETA", f"Song nenašiel požadované polia: {data}", session_id)
             return {
                 "raw": data,
                 "recorded_at": rec_at,
@@ -106,51 +97,25 @@ def get_current_song():
             "song_session_id": str(uuid.uuid4())
         }
 
-async def try_get_listeners_once():
-    global last_successful_listeners, last_listeners_update, LAST_RAW_LISTENERS, LAST_RAW_LISTENERS_TS
+async def get_current_listeners(session_id=None):
     try:
         async with websockets.connect(LISTENERS_WS) as websocket:
-            raw = await asyncio.wait_for(websocket.recv(), timeout=30.0)
-            data = json.loads(raw)
+            msg = await asyncio.wait_for(websocket.recv(), timeout=20)
+            data = json.loads(msg)
             raw_valid = is_valid_listeners(data)
-            LAST_RAW_LISTENERS = data
-            LAST_RAW_LISTENERS_TS = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
-
-            return data
+            if not raw_valid:
+                log_radio_event("BETA", f"Neplatná štruktúra listeners: {data}", session_id)
+            return {
+                "raw": data,
+                "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+                "raw_valid": raw_valid,
+                "song_session_id": session_id
+            }
     except Exception as e:
-        log_radio_event("BETA", f"Chyba pri pokuse o listeners: {e}")
-        return {}
-
-async def get_current_listeners(session_id=None):
-    global last_successful_listeners, last_listeners_update, LAST_RAW_LISTENERS, LAST_RAW_LISTENERS_TS
-    current_time = time_module.time()
-
-    if (
-        LAST_RAW_LISTENERS is not None
-        and (current_time - last_listeners_update < LISTENERS_CACHE_TIME)
-    ):
-        data = LAST_RAW_LISTENERS
-        raw_valid = is_valid_listeners(data)
+        log_radio_event("BETA", f"Nepodarilo sa získať poslucháčov: {e}", session_id)
         return {
-            "raw": data,
-            "recorded_at": LAST_RAW_LISTENERS_TS or datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": raw_valid,
-            "song_session_id": session_id
-        }
-
-    if current_time - last_listeners_update >= LISTENERS_CACHE_TIME:
-        data = await try_get_listeners_once()
-        raw_valid = is_valid_listeners(data)
-        return {
-            "raw": data,
+            "raw": {},
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-            "raw_valid": raw_valid,
+            "raw_valid": False,
             "song_session_id": session_id
         }
-
-    return {
-        "raw": {},
-        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-        "raw_valid": False,
-        "song_session_id": session_id
-    }

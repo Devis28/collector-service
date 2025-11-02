@@ -15,65 +15,80 @@ def log_radio_event(radio_name, text, session_id=None):
     session_part = f" [{session_id}]" if session_id else ""
     print(f"[{timestamp}] [{radio_name}]{session_part} {text}")
 
+def is_valid_song(data):
+    # Musí obsahovať presne tento set keys (nič menej ani viac), vnútri song!
+    required_keys = {"musicAuthor", "musicCover", "musicTitle", "radio", "startTime"}
+    return (
+        isinstance(data, dict)
+        and "song" in data
+        and set(data["song"].keys()) == required_keys
+    )
+
+def flatten_song(song_obj):
+    raw = song_obj.get("raw", {})
+    flat = {k: raw["song"][k] for k in ("musicAuthor", "musicCover", "musicTitle", "radio", "startTime")} if "song" in raw else {}
+    flat["recorded_at"] = song_obj["recorded_at"]
+    flat["raw_valid"] = song_obj["raw_valid"]
+    flat["song_session_id"] = song_obj["song_session_id"]
+    return flat
+
 def get_current_song():
     try:
-        r = requests.get(SONG_API)
+        r = requests.get(SONG_API, timeout=10)
         data = r.json()
-        raw_valid = (
-            "last_update" in data and
-            "song" in data and
-            all(k in data["song"] for k in [
-                "musicAuthor", "musicCover", "musicTitle", "radio", "startTime"
-            ])
-        )
+        raw_valid = is_valid_song(data)
         session_id = str(uuid.uuid4())
         return {
-            **data,
+            "raw": data,
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": raw_valid,
             "song_session_id": session_id
         }
-    except Exception:
+    except Exception as e:
+        log_radio_event("FUNRADIO", f"Skladba nebola získaná: {e}")
         return {
+            "raw": {},
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": False,
             "song_session_id": str(uuid.uuid4())
         }
 
+def is_valid_listeners(data):
+    # Presne len listeners key, nič menej ani viac, a musí byť int
+    return (
+        isinstance(data, dict)
+        and set(data.keys()) == {"listeners"}
+        and isinstance(data.get("listeners"), int)
+    )
+
+def flatten_listener(listener_obj):
+    raw = listener_obj.get("raw", {})
+    flat = {"listeners": raw.get("listeners")}
+    flat["recorded_at"] = listener_obj["recorded_at"]
+    flat["raw_valid"] = listener_obj["raw_valid"]
+    flat["song_session_id"] = listener_obj["song_session_id"]
+    return flat
+
 async def get_current_listeners(session_id=None):
-    uri = LISTENERS_WS
-    listeners_data = None
-    async with websockets.connect(uri) as websocket:
-        try:
-            latest = None
-            # 18 pokusov × 2.5s = max 45 sekúnd na listeners správu
-            for _ in range(18):
-                try:
-                    raw = await asyncio.wait_for(websocket.recv(), timeout=2.5)
-                except asyncio.TimeoutError:
-                    continue
-                data = json.loads(raw)
-                # Prijmi prvé "listeners" ktoré príde
-                if "listeners" in data:
-                    latest = data["listeners"]
-                    break  # len prvé listeners v cykle, potom ukonči
-            if latest is not None:
-                listeners_data = {
-                    "listeners": latest,
-                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                    "raw_valid": True,
-                    "song_session_id": session_id
-                }
-            else:
-                listeners_data = {
-                    "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                    "raw_valid": False,
-                    "song_session_id": session_id
-                }
-        except Exception:
-            listeners_data = {
+    try:
+        async with websockets.connect(LISTENERS_WS) as websocket:
+            msg = await asyncio.wait_for(websocket.recv(), timeout=20)
+            data = json.loads(msg)
+            raw_valid = is_valid_listeners(data)
+            result = {
+                "raw": data,
                 "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-                "raw_valid": False,
+                "raw_valid": raw_valid,
                 "song_session_id": session_id
             }
-    return listeners_data
+            if not raw_valid:
+                log_radio_event("FUNRADIO", f"Nesprávne alebo chýbajúce údaje o listeners ({data})", session_id)
+            return result
+    except Exception as e:
+        log_radio_event("FUNRADIO", f"Nepodarilo sa získať listeners: {e}", session_id)
+        return {
+            "raw": {},
+            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+            "raw_valid": False,
+            "song_session_id": session_id
+        }
