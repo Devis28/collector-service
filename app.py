@@ -5,54 +5,55 @@ import uuid
 import threading
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from writer import upload_file
+
 from adapters.radio_melody import (
     get_current_song as get_song_melody,
     get_current_listeners as get_listeners_melody,
-    log_radio_event as log_melody_event,
     flatten_song as flatten_melody_song,
     flatten_listener as flatten_melody_listener
 )
 from adapters.radio_rock import (
     get_current_song as get_song_rock,
     get_current_listeners as get_listeners_rock,
-    log_radio_event as log_rock_event,
     flatten_song as flatten_rock_song,
     flatten_listener as flatten_rock_listener
 )
 from adapters.radio_funradio import (
     get_current_song as get_song_funradio,
     get_current_listeners as get_listeners_funradio,
-    log_radio_event as log_funradio_event,
     flatten_song as flatten_funradio_song,
     flatten_listener as flatten_funradio_listener
 )
 from adapters.radio_vlna import (
     get_current_song as get_song_vlna,
     get_current_listeners as get_listeners_vlna,
-    log_radio_event as log_vlna_event,
     flatten_song as flatten_vlna_song,
     flatten_listener as flatten_vlna_listener
 )
 from adapters.radio_beta import (
     get_current_song as get_song_beta,
     get_current_listeners as get_listeners_beta,
-    log_radio_event as log_beta_event,
     flatten_song as flatten_beta_song,
     flatten_listener as flatten_beta_listener
 )
 from adapters.radio_expres import (
     get_current_song as get_song_expres,
     get_current_listeners as get_listeners_expres,
-    log_radio_event as log_expres_event,
     flatten_song as flatten_expres_song,
     flatten_listener as flatten_expres_listener
 )
 
-from writer import upload_file
-
 INTERVAL = 40
 INTERVAL_VLNA = 60
 BATCH_TIME = 600
+
+def log_radio_event(radio_name, text, session_id=None):
+    now = datetime.now(ZoneInfo("Europe/Bratislava"))
+    timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
+    radio_fmt = f"{radio_name:<10}"
+    session_part = f" [{session_id}]" if session_id else ""
+    print(f"[{timestamp}] [{radio_fmt}]{session_part}\t{text}")
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
@@ -73,24 +74,20 @@ def melody_worker():
         key = (title, artist)
 
         if not current_song["raw_valid"]:
-            log_melody_event(RADIO_NAME, f"\tNeplatný alebo žiadny song z API! Raw: {raw}", session_id)
+            log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         if previous_key != key:
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_melody_event(RADIO_NAME, f"\tZachytená skladba: {title} | {artist}", session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_melody_song(current_song))
         else:
-            log_melody_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {artist}")
+            log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}", session_id)
 
         listeners_data = asyncio.run(get_listeners_melody(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
-        log_melody_event(
-            RADIO_NAME,
-            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
-            session_id
-        )
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_melody_listener(listeners_data))
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -104,8 +101,8 @@ def melody_worker():
             save_json(listeners_data_batch, listeners_path_local)
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
-            log_melody_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_melody_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
@@ -127,26 +124,22 @@ def rock_worker():
         key = (title, author)
 
         if not current_song["raw_valid"]:
-            log_rock_event(RADIO_NAME, f"\tNeplatný alebo žiadny song z API! Raw: {raw}", session_id)
+            log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         if previous_key != key and current_song["raw_valid"]:
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_rock_event(RADIO_NAME, f"\tZachytená skladba: {title} | {author}", session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_rock_song(current_song))
         else:
-            log_rock_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {author}")
+            log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}", session_id)
 
         listeners_data = asyncio.run(get_listeners_rock(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_rock_event(RADIO_NAME, f"\tNeplatná štruktúra listeners: {raw_list}", session_id)
-        log_rock_event(
-            RADIO_NAME,
-            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
-            session_id
-        )
+            log_radio_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_rock_listener(listeners_data))
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -160,8 +153,8 @@ def rock_worker():
             save_json(listeners_data_batch, listeners_path_local)
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
-            log_rock_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_rock_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
@@ -182,27 +175,23 @@ def funradio_worker():
         author = song.get("musicAuthor")
 
         if not current_song["raw_valid"]:
-            log_funradio_event(RADIO_NAME, f"\tNeplatný alebo žiadny song z API! Raw: {song}", session_id)
+            log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {song}", session_id)
         elif (previous_title != title or previous_author != author) and title and author:
             session_id = str(uuid.uuid4())
             previous_title = title
             previous_author = author
             current_song["song_session_id"] = session_id
-            log_funradio_event(RADIO_NAME, f"\tZachytená skladba: {title} | {author}", session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_funradio_song(current_song))
         elif title and author:
-            log_funradio_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {author}")
+            log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}", session_id)
 
         listeners_data = asyncio.run(get_listeners_funradio(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_funradio_event(RADIO_NAME, f"\tNeplatná štruktúra listeners: {raw_list}", session_id)
-        log_funradio_event(
-            RADIO_NAME,
-            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
-            session_id
-        )
+            log_radio_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_funradio_listener(listeners_data))
 
         if time.time() - last_batch_time >= BATCH_TIME:
@@ -217,8 +206,8 @@ def funradio_worker():
             save_json(listeners_data_batch, listeners_path_local)
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
-            log_funradio_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_funradio_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
@@ -238,20 +227,20 @@ def vlna_worker():
         artist = raw.get("artist")
         key = (title, artist)
         if not current_song["raw_valid"]:
-            log_vlna_event(RADIO_NAME, f"\tSkladba sa nenašla, alebo nesprávne dáta!", session_id)
+            log_radio_event(RADIO_NAME, f"Skladba sa nenašla, alebo nesprávne dáta!", session_id)
         if last_song != key and current_song["raw_valid"]:
             session_id = str(uuid.uuid4())
             last_song = key
             current_song["song_session_id"] = session_id
-            log_vlna_event(RADIO_NAME, f"\tZachytená skladba: {title} | {artist}", session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_vlna_song(current_song))
 
         listeners_data = asyncio.run(get_listeners_vlna(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_vlna_event(RADIO_NAME, f"\tNepodarilo sa získať počet poslucháčov (prázdny alebo zlá štruktúra)!", session_id)
-        log_vlna_event(RADIO_NAME, f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
+            log_radio_event(RADIO_NAME, f"Nepodarilo sa získať počet poslucháčov (prázdny alebo zlá štruktúra)!", session_id)
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_vlna_listener(listeners_data))
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -265,8 +254,8 @@ def vlna_worker():
             save_json(listeners_data_batch, listeners_path_local)
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
-            log_vlna_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_vlna_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
@@ -292,26 +281,25 @@ def beta_worker():
             interpreters = None
 
         if not current_song["raw_valid"]:
-            log_beta_event(RADIO_NAME, f"\tNeplatný alebo žiadny song z API! Raw: {raw}", session_id)
+            log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         elif (title != previous_title or interpreters != previous_interpreters) and title and interpreters:
             session_id = str(uuid.uuid4())
             previous_title = title
             previous_interpreters = interpreters
             current_song["song_session_id"] = session_id
-            msg = f"\tZachytená skladba: {title} | {interpreters}"
-            log_beta_event(RADIO_NAME, msg, session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {interpreters}", session_id)
             song_data_batch.append(flatten_beta_song(current_song))
         elif title and interpreters:
-            log_beta_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {interpreters}")
+            log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {interpreters}", session_id)
 
         listeners_data = asyncio.run(get_listeners_beta(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_beta_event(RADIO_NAME, f"\tNeplatná štruktúra listeners: {raw_list}", session_id)
-        log_beta_event(
+            log_radio_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
+        log_radio_event(
             RADIO_NAME,
-            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
+            f"Zachytení poslucháči: {raw_list.get('listeners', '?')}",
             session_id,
         )
         listeners_data_batch.append(flatten_beta_listener(listeners_data))
@@ -327,8 +315,8 @@ def beta_worker():
             save_json(listeners_data_batch, listeners_path_local)
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
-            log_beta_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_beta_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
@@ -347,26 +335,22 @@ def expres_worker():
         artist = ", ".join(song.get("artists", []))
         current_song_identifier = f"{title}_{artist}"
         if not song.get("raw_valid"):
-            log_expres_event(RADIO_NAME, f"\tNeplatný alebo žiadny song z API! Raw: {song}", session_id)
+            log_radio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {song}", session_id)
         if title and (current_song_identifier != previous_song) and song.get("raw_valid"):
             session_id = song.get("song_session_id", str(uuid.uuid4()))
             previous_song = current_song_identifier
             song["song_session_id"] = session_id
-            log_expres_event(RADIO_NAME, f"\tZachytená skladba: {title} | {artist}", session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_expres_song(song))
         else:
-            log_expres_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {artist}")
+            log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}", session_id)
 
         listeners_data = get_listeners_expres(session_id)
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_expres_event(RADIO_NAME, f"\tNeplatná štruktúra listeners: {raw_list}", session_id)
-        log_expres_event(
-            RADIO_NAME,
-            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
-            session_id
-        )
+            log_radio_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
         listeners_data_batch.append(flatten_expres_listener(listeners_data))
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
@@ -380,8 +364,8 @@ def expres_worker():
             save_json(listeners_data_batch, listeners_path_local)
             upload_file(song_path_local, song_path_r2)
             upload_file(listeners_path_local, listeners_path_r2)
-            log_expres_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {song_path_r2}", session_id)
-            log_expres_event(RADIO_NAME, f"\tDáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
