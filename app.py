@@ -181,7 +181,11 @@ def funradio_worker():
         song = current_song.get("song", {})
         title = song.get("musicTitle")
         author = song.get("musicAuthor")
-        key = (title, author)
+
+        # DEBUG logy pre každú iteráciu
+        print("DEBUG FUNRADIO RAW:", current_song)
+        print("DEBUG FUNRADIO song keys:", list(song.keys()) if isinstance(song, dict) else song)
+        print("DEBUG: valid?", current_song["raw_valid"], "title:", title, "| author:", author)
 
         if not current_song["raw_valid"]:
             log_funradio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {song}", session_id)
@@ -207,6 +211,7 @@ def funradio_worker():
             session_id
         )
         listeners_data_batch.append(flatten_funradio_listener(listeners_data))
+
         if time.time() - last_batch_time >= BATCH_TIME:
             now = datetime.now(ZoneInfo("Europe/Bratislava"))
             date_str = now.strftime("%d-%m-%Y")
