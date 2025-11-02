@@ -133,7 +133,7 @@ def rock_worker():
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_rock_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
+            log_rock_event(RADIO_NAME, f"\tZachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_rock_song(current_song))
         else:
             print(f"[ROCK] Skladba nezmenená: {title} | {author}")
@@ -306,7 +306,7 @@ def beta_worker():
             previous_title = title
             previous_interpreters = interpreters
             current_song["song_session_id"] = session_id
-            msg = f"Zachytená skladba: {title} | {interpreters}"
+            msg = f"\tZachytená skladba: {title} | {interpreters}"
             log_beta_event(RADIO_NAME, msg, session_id)
             song_data_batch.append(flatten_beta_song(current_song))
         elif title and interpreters:
