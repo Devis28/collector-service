@@ -54,7 +54,7 @@ def log_radio_event(radio_name, text, session_id=None):
     prefix = f"[{timestamp}] [{radio_name}]"
     if session_id:
         prefix += f" [{session_id}]"
-    print(prefix + '\t' + text)
+    print(prefix + '\t\t' + text)
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
@@ -127,7 +127,7 @@ def rock_worker():
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_radio_event(RADIO_NAME, f"\t\tZachytená skladba: {title} | {author}", session_id)
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_rock_song(current_song))
         else:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}", session_id)
