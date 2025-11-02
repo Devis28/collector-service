@@ -61,7 +61,7 @@ def save_json(data, path):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 def melody_worker():
-    RADIO_NAME = "MELODY  "
+    RADIO_NAME = "MELODY"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
@@ -108,7 +108,7 @@ def melody_worker():
         time.sleep(INTERVAL)
 
 def rock_worker():
-    RADIO_NAME = "ROCK    "
+    RADIO_NAME = "ROCK"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
@@ -208,7 +208,7 @@ def funradio_worker():
         time.sleep(INTERVAL)
 
 def vlna_worker():
-    RADIO_NAME = "VLNA    "
+    RADIO_NAME = "VLNA"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
@@ -255,7 +255,7 @@ def vlna_worker():
         time.sleep(INTERVAL_VLNA)
 
 def beta_worker():
-    RADIO_NAME = "BETA    "
+    RADIO_NAME = "BETA"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
@@ -309,7 +309,7 @@ def beta_worker():
         time.sleep(INTERVAL)
 
 def expres_worker():
-    RADIO_NAME = "EXPRES  "
+    RADIO_NAME = "EXPRES"
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
