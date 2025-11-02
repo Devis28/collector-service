@@ -54,9 +54,8 @@ def log_radio_event(radio_name, text, session_id=None):
     prefix = f"[{timestamp}] [{radio_name}]"
     if session_id:
         prefix += f" [{session_id}]"
-    # Nastav na ktorom stĺpci má začať správa (tu 40, uprav podľa konzoly)
-    target_col = 40
-    msg = prefix.ljust(target_col) + text
+    FIXED_PREFIX_WIDTH = 54   # Presne podľa tvojho vzoru pre zarovnanie!
+    msg = prefix.ljust(FIXED_PREFIX_WIDTH) + text
     print(msg)
 
 def save_json(data, path):
