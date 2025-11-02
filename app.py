@@ -54,9 +54,7 @@ def log_radio_event(radio_name, text, session_id=None):
     prefix = f"[{timestamp}] [{radio_name}]"
     if session_id:
         prefix += f" [{session_id}]"
-    FIXED_PREFIX_WIDTH = 54   # Presne podľa tvojho vzoru pre zarovnanie!
-    msg = prefix.ljust(FIXED_PREFIX_WIDTH) + text
-    print(msg)
+    print(prefix + '\t' + text)
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
