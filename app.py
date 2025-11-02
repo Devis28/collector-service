@@ -178,11 +178,12 @@ def funradio_worker():
     session_id = None
     while True:
         current_song = get_song_funradio()
-        song = current_song.get("song", {})
+        # Skús najskôr, či vo výsledku current_song nie je song objekt ešte o úroveň nižšie
+        song = current_song["raw"].get("song", {}) if isinstance(current_song.get("raw"), dict) else {}
         title = song.get("musicTitle")
         author = song.get("musicAuthor")
 
-        # DEBUG logy pre každú iteráciu
+        # Podrobné debug logovanie
         print("DEBUG FUNRADIO RAW:", current_song)
         print("DEBUG FUNRADIO song keys:", list(song.keys()) if isinstance(song, dict) else song)
         print("DEBUG: valid?", current_song["raw_valid"], "title:", title, "| author:", author)
@@ -198,7 +199,6 @@ def funradio_worker():
             song_data_batch.append(flatten_funradio_song(current_song))
         elif title and author:
             print(f"[FUNRADIO] Skladba nezmenená: {title} | {author}")
-        # Ak title alebo author je None, nič nevypisuj (ani chybový výpis)
 
         listeners_data = asyncio.run(get_listeners_funradio(session_id))
         listeners_data["song_session_id"] = session_id
