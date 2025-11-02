@@ -309,7 +309,7 @@ def beta_worker():
         time.sleep(INTERVAL)
 
 def expres_worker():
-    RADIO_NAME = "EXPRES   "
+    RADIO_NAME = "EXPRES  "
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
