@@ -57,17 +57,24 @@ def melody_worker():
     previous_key = None
     session_id = None
     while True:
+        print("[MELODY] Tick začiatok cyklu")  # DEBUG
         current_song = get_song_melody()
         raw = current_song.get("raw", {})
         title = raw.get("title")
         artist = raw.get("artist")
         key = (title, artist)
+
+        if not current_song["raw_valid"]:
+            log_melody_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
         if previous_key != key:
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
             log_melody_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_melody_song(current_song))
+        else:
+            print(f"[MELODY] Skladba nezmenená: {title} | {artist}")
+
         listeners_data = asyncio.run(get_listeners_melody(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
@@ -95,6 +102,7 @@ def melody_worker():
             listeners_data_batch.clear()
             last_batch_time = time.time()
         time.sleep(INTERVAL)
+
 
 def rock_worker():
     RADIO_NAME = "ROCK"
