@@ -127,7 +127,7 @@ def rock_worker():
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
+            log_radio_event(RADIO_NAME, f"\tZachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_rock_song(current_song))
         else:
             log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}", session_id)
