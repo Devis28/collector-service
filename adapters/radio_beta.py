@@ -14,7 +14,7 @@ def log_radio_event(radio_name, text, session_id=None):
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
     radio_fmt = f"{radio_name:}"
     session_part = f" [{session_id}]" if session_id else ""
-    print(f"[{timestamp}] [{radio_fmt}]{session_part} {text}")
+    print(f"[{timestamp}] [{radio_fmt}    ]{session_part} {text}")
 
 def is_valid_song(data):
     wanted = {"radio", "interpreters", "title", "start_time", "timestamp"}
