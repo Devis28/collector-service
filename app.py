@@ -66,7 +66,7 @@ def melody_worker():
     previous_key = None
     session_id = None
     while True:
-        print("[MELODY] Tick začiatok cyklu")  # DEBUG
+        # print("[MELODY] Tick začiatok cyklu")  # DEBUG
         current_song = get_song_melody()
         raw = current_song.get("raw", {})
         title = raw.get("title")
@@ -79,10 +79,10 @@ def melody_worker():
             session_id = str(uuid.uuid4())
             previous_key = key
             current_song["song_session_id"] = session_id
-            log_melody_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
+            log_melody_event(RADIO_NAME, f"\tZachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_melody_song(current_song))
         else:
-            print(f"[MELODY] Skladba nezmenená: {title} | {artist}")
+            log_melody_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}")
 
         listeners_data = asyncio.run(get_listeners_melody(session_id))
         listeners_data["song_session_id"] = session_id
@@ -136,7 +136,7 @@ def rock_worker():
             log_rock_event(RADIO_NAME, f"\tZachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_rock_song(current_song))
         else:
-            print(f"[ROCK] Skladba nezmenená: {title} | {author}")
+            log_rock_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}")
 
         listeners_data = asyncio.run(get_listeners_rock(session_id))
         listeners_data["song_session_id"] = session_id
@@ -184,9 +184,9 @@ def funradio_worker():
         author = song.get("musicAuthor")
 
         # Podrobné debug logovanie
-        print("DEBUG FUNRADIO RAW:", current_song)
-        print("DEBUG FUNRADIO song keys:", list(song.keys()) if isinstance(song, dict) else song)
-        print("DEBUG: valid?", current_song["raw_valid"], "title:", title, "| author:", author)
+        #print("DEBUG FUNRADIO RAW:", current_song)
+        #print("DEBUG FUNRADIO song keys:", list(song.keys()) if isinstance(song, dict) else song)
+        #print("DEBUG: valid?", current_song["raw_valid"], "title:", title, "| author:", author)
 
         if not current_song["raw_valid"]:
             log_funradio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {song}", session_id)
@@ -198,7 +198,7 @@ def funradio_worker():
             log_funradio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_funradio_song(current_song))
         elif title and author:
-            print(f"[FUNRADIO] Skladba nezmenená: {title} | {author}")
+            log_funradio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}")
 
         listeners_data = asyncio.run(get_listeners_funradio(session_id))
         listeners_data["song_session_id"] = session_id
@@ -300,7 +300,7 @@ def beta_worker():
             interpreters = None
 
         if not current_song["raw_valid"]:
-            log_beta_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
+            log_beta_event(RADIO_NAME, f"\nNeplatný alebo žiadny song z API! Raw: {raw}", session_id)
         elif (title != previous_title or interpreters != previous_interpreters) and title and interpreters:
             session_id = str(uuid.uuid4())
             previous_title = title
@@ -310,7 +310,7 @@ def beta_worker():
             log_beta_event(RADIO_NAME, msg, session_id)
             song_data_batch.append(flatten_beta_song(current_song))
         elif title and interpreters:
-            print(f"[BETA] Skladba nezmenená: {title} | {interpreters}")
+            log_beta_event(RADIO_NAME, f"Skladba nezmenená: {title} | {interpreters}")
         # Ak title alebo interpreters je None, nič nevypisuj
 
         listeners_data = asyncio.run(get_listeners_beta(session_id))
@@ -364,7 +364,7 @@ def expres_worker():
             log_expres_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
             song_data_batch.append(flatten_expres_song(song))
         else:
-            print(f"[EXPRES] Skladba nezmenená: {title} | {artist}")
+            log_expres_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}")
 
         listeners_data = get_listeners_expres(session_id)
         listeners_data["song_session_id"] = session_id
