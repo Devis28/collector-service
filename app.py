@@ -128,7 +128,7 @@ def rock_worker():
         key = (title, author)
 
         if not current_song["raw_valid"]:
-            log_rock_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
+            log_rock_event(RADIO_NAME, f"\tNeplatný alebo žiadny song z API! Raw: {raw}", session_id)
         if previous_key != key and current_song["raw_valid"]:
             session_id = str(uuid.uuid4())
             previous_key = key
@@ -136,16 +136,16 @@ def rock_worker():
             log_rock_event(RADIO_NAME, f"\tZachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_rock_song(current_song))
         else:
-            log_rock_event(RADIO_NAME, f"Skladba nezmenená: {title} | {author}")
+            log_rock_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {author}")
 
         listeners_data = asyncio.run(get_listeners_rock(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_rock_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
+            log_rock_event(RADIO_NAME, f"\tNeplatná štruktúra listeners: {raw_list}", session_id)
         log_rock_event(
             RADIO_NAME,
-            f"Zachytení poslucháči: {raw_list.get('listeners', '?')}",
+            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
             session_id
         )
         listeners_data_batch.append(flatten_rock_listener(listeners_data))
@@ -310,17 +310,17 @@ def beta_worker():
             log_beta_event(RADIO_NAME, msg, session_id)
             song_data_batch.append(flatten_beta_song(current_song))
         elif title and interpreters:
-            log_beta_event(RADIO_NAME, f"Skladba nezmenená: {title} | {interpreters}")
+            log_beta_event(RADIO_NAME, f"\tSkladba nezmenená: {title} | {interpreters}")
         # Ak title alebo interpreters je None, nič nevypisuj
 
         listeners_data = asyncio.run(get_listeners_beta(session_id))
         listeners_data["song_session_id"] = session_id
         raw_list = listeners_data.get("raw", {})
         if not listeners_data["raw_valid"]:
-            log_beta_event(RADIO_NAME, f"Neplatná štruktúra listeners: {raw_list}", session_id)
+            log_beta_event(RADIO_NAME, f"\tNeplatná štruktúra listeners: {raw_list}", session_id)
         log_beta_event(
             RADIO_NAME,
-            f"Zachytení poslucháči: {raw_list.get('listeners', '?')}",
+            f"\tZachytení poslucháči: {raw_list.get('listeners', '?')}",
             session_id,
         )
         listeners_data_batch.append(flatten_beta_listener(listeners_data))
