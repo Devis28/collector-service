@@ -185,15 +185,16 @@ def funradio_worker():
 
         if not current_song["raw_valid"]:
             log_funradio_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {song}", session_id)
-        if previous_title != title or previous_author != author:
+        elif (previous_title != title or previous_author != author) and title and author:
             session_id = str(uuid.uuid4())
             previous_title = title
             previous_author = author
             current_song["song_session_id"] = session_id
             log_funradio_event(RADIO_NAME, f"Zachytená skladba: {title} | {author}", session_id)
             song_data_batch.append(flatten_funradio_song(current_song))
-        else:
+        elif title and author:
             print(f"[FUNRADIO] Skladba nezmenená: {title} | {author}")
+        # Ak title alebo author je None, nič nevypisuj (ani chybový výpis)
 
         listeners_data = asyncio.run(get_listeners_funradio(session_id))
         listeners_data["song_session_id"] = session_id
@@ -278,40 +279,34 @@ def beta_worker():
     last_batch_time = time.time()
     song_data_batch = []
     listeners_data_batch = []
-    last_song_data = None
+    previous_title = None
+    previous_interpreters = None
     session_id = None
     while True:
         current_song = get_song_beta()
         raw = current_song.get("raw", {})
-        if raw.get("is_playing", True) is False:
-            song_key = (raw.get("radio"), raw.get("is_playing"), raw.get("timestamp"))
+
+        # Ak hrá song
+        if raw.get("is_playing", True):
+            title = raw.get("title")
+            interpreters = raw.get("interpreters")
         else:
-            song_key = (
-                raw.get("radio"),
-                raw.get("interpreters"),
-                raw.get("title"),
-                raw.get("start_time"),
-                raw.get("timestamp"),
-            )
-        if last_song_data != song_key:
+            title = None
+            interpreters = None
+
+        if not current_song["raw_valid"]:
+            log_beta_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
+        elif (title != previous_title or interpreters != previous_interpreters) and title and interpreters:
             session_id = str(uuid.uuid4())
-            last_song_data = song_key
+            previous_title = title
+            previous_interpreters = interpreters
             current_song["song_session_id"] = session_id
-            if current_song["raw_valid"]:
-                if raw.get("is_playing", True):
-                    msg = f"Zachytená skladba: {raw.get('title', '')} | {raw.get('interpreters', '')}"
-                else:
-                    msg = f"Nothing is playing"
-                log_beta_event(
-                    RADIO_NAME,
-                    msg,
-                    session_id,
-                )
-                song_data_batch.append(flatten_beta_song(current_song))
-            else:
-                log_beta_event(RADIO_NAME, f"Neplatný alebo žiadny song z API! Raw: {raw}", session_id)
-        else:
-            print(f"[BETA] Skladba nezmenená: {raw.get('title', '')} | {raw.get('interpreters', '')}")
+            msg = f"Zachytená skladba: {title} | {interpreters}"
+            log_beta_event(RADIO_NAME, msg, session_id)
+            song_data_batch.append(flatten_beta_song(current_song))
+        elif title and interpreters:
+            print(f"[BETA] Skladba nezmenená: {title} | {interpreters}")
+        # Ak title alebo interpreters je None, nič nevypisuj
 
         listeners_data = asyncio.run(get_listeners_beta(session_id))
         listeners_data["song_session_id"] = session_id

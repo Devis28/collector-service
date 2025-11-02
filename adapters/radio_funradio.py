@@ -16,13 +16,13 @@ def log_radio_event(radio_name, text, session_id=None):
     print(f"[{timestamp}] [{radio_name}]{session_part} {text}")
 
 def is_valid_song(data):
-    # Musí obsahovať presne tento set keys (nič menej ani viac), vnútri song!
     required_keys = {"musicAuthor", "musicCover", "musicTitle", "radio", "startTime"}
     return (
         isinstance(data, dict)
         and "song" in data
         and set(data["song"].keys()) == required_keys
     )
+
 
 def flatten_song(song_obj):
     raw = song_obj.get("raw", {})
