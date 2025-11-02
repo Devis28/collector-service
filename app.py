@@ -51,7 +51,7 @@ BATCH_TIME = 600
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    prefix = f"[{timestamp}] [{radio_name.ljust(10)}]"
+    prefix = f"[{timestamp}] [{radio_name.ljust(8)}]"
     if session_id:
         prefix += f" [{session_id}]"
     print(prefix + '' + text)
