@@ -14,7 +14,7 @@ def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
     session_part = f" [{session_id}]" if session_id else ""
-    print(f"[{timestamp}] [{radio_name}]{' ' * (8 - len(radio_name))} {session_part} {text}")
+    print(f"[{timestamp}] [{radio_name}]{' ' * (8 - len(radio_name))}{session_part} {text}")
 
 def is_valid_song(data):
     # Presne keys, nič navyše ani menej!
