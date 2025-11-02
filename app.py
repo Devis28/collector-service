@@ -51,6 +51,7 @@ from adapters.radio_expres import (
 from writer import upload_file
 
 INTERVAL = 40
+INTERVAL_VLNA = 60
 BATCH_TIME = 600
 
 def save_json(data, path):
@@ -270,7 +271,7 @@ def vlna_worker():
             song_data_batch.clear()
             listeners_data_batch.clear()
             last_batch_time = time.time()
-        time.sleep(INTERVAL)
+        time.sleep(INTERVAL_VLNA)
 
 def beta_worker():
     RADIO_NAME = "BETA"
