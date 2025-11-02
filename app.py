@@ -51,10 +51,10 @@ BATCH_TIME = 600
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
     timestamp = now.strftime("%d.%m.%Y %H:%M:%S")
-    prefix = f"[{timestamp}] [{radio_name}]"
+    prefix = f"[{timestamp}] [{radio_name}]\t "
     if session_id:
         prefix += f" [{session_id}]"
-    print(prefix + '' + text)
+    print(prefix + '\t' + text)
 
 def save_json(data, path):
     with open(path, "w", encoding="utf-8") as f:
