@@ -100,7 +100,7 @@ def get_current_song():
 async def get_current_listeners(session_id=None):
     try:
         async with websockets.connect(LISTENERS_WS) as websocket:
-            msg = await asyncio.wait_for(websocket.recv(), timeout=20)
+            msg = await asyncio.wait_for(websocket.recv(), timeout=30)
             data = json.loads(msg)
             raw_valid = is_valid_listeners(data)
             if not raw_valid:
