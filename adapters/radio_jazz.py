@@ -101,22 +101,38 @@ async def get_current_listeners(session_id=None):
             "raw_valid": False,
             "song_session_id": session_id
         }
-    # Priraď vždy aktuálne session_id zo skladby!
     payload["song_session_id"] = session_id
     return payload
 
-# ---------- Príklad worker funkcie ----------
 async def main_jazz_worker():
+    previous_key = None
+    session_id = None
     while True:
-        song = get_current_song()
-        session_id = song["song_session_id"]
-        listeners = await get_current_listeners(session_id)
-        # Skladba aj listeners majú rovnaké session_id
-        log_radio_event("JAZZ", f"Zachytená skladba: {song.get('title')} | {song.get('artist')}", session_id)
-        if listeners["raw_valid"]:
-            log_radio_event("JAZZ", f"Zachytení poslucháči: {listeners['raw'].get('listeners')}", session_id)
+        current_song = get_current_song()
+        title = current_song.get("title")
+        artist = current_song.get("artist")
+        key = (title, artist)
+        if not current_song["raw_valid"]:
+            log_radio_event("JAZZ", f"Skladba sa nenašla, alebo nesprávne dáta! {current_song.get('raw')}", session_id)
+        elif previous_key != key and current_song["raw_valid"]:
+            session_id = str(uuid.uuid4())
+            previous_key = key
+            current_song["song_session_id"] = session_id
+            log_radio_event("JAZZ", f"Zachytená skladba: {title} | {artist}", session_id)
         else:
-            log_radio_event("JAZZ", "Zachytení poslucháči: ?", session_id)
-        await asyncio.sleep(40)  # alebo podľa potreby
+            log_radio_event("JAZZ", f"Skladba nezmenená: {title} | {artist}", session_id)
+        listeners_data = await get_current_listeners(session_id)
+        listeners_data["song_session_id"] = session_id
+        raw_list = listeners_data.get("raw", {})
+        if not listeners_data["raw_valid"]:
+            log_radio_event("JAZZ", f"Nepodarilo sa získať poslucháčov alebo nesprávne dáta! {raw_list}", session_id)
+        log_radio_event("JAZZ", f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
+        await asyncio.sleep(40)  # uprav na požadovaný interval
 
-# Spusti worker ručne z if __name__ == "__main__" alebo zo služby
+@app.on_event("startup")
+async def start_worker():
+    asyncio.create_task(main_jazz_worker())
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("adapters.radio_jazz:app", host="0.0.0.0", port=8002, reload=True)
