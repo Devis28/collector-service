@@ -1,13 +1,14 @@
 import threading
 import requests
+import asyncio
 from fastapi import FastAPI, Request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-SONG_API = "http://147.232.40.154:8000/current"
+SONG_API = "http://147.232.40.154:8000/current"  # Ak treba, uprav podľa rádia
 
-# Thread-safe cache for latest listeners payload from webhook
+# Globálne thread-safe úložisko posledného listeners payloadu
 last_listeners_payload = {}
 last_lock = threading.Lock()
 
@@ -79,13 +80,9 @@ def get_current_song():
             "song_session_id": str(uuid.uuid4())
         }
 
-def is_valid_listeners(data):
-    required = {"timestamp", "listeners", "radio"}
-    return isinstance(data, dict) and set(data.keys()) == required and isinstance(data["listeners"], int)
-
 def flatten_listener(listener_obj):
     raw = listener_obj.get("raw", {})
-    session_id = listener_obj.get("song_session_id")
+    session_id = listener_obj["song_session_id"]
     flat = {k: raw.get(k) for k in ["timestamp", "listeners", "radio"]}
     flat["recorded_at"] = listener_obj["recorded_at"]
     flat["raw_valid"] = listener_obj["raw_valid"]
@@ -104,5 +101,22 @@ async def get_current_listeners(session_id=None):
             "raw_valid": False,
             "song_session_id": session_id
         }
+    # Priraď vždy aktuálne session_id zo skladby!
     payload["song_session_id"] = session_id
     return payload
+
+# ---------- Príklad worker funkcie ----------
+async def main_jazz_worker():
+    while True:
+        song = get_current_song()
+        session_id = song["song_session_id"]
+        listeners = await get_current_listeners(session_id)
+        # Skladba aj listeners majú rovnaké session_id
+        log_radio_event("JAZZ", f"Zachytená skladba: {song.get('title')} | {song.get('artist')}", session_id)
+        if listeners["raw_valid"]:
+            log_radio_event("JAZZ", f"Zachytení poslucháči: {listeners['raw'].get('listeners')}", session_id)
+        else:
+            log_radio_event("JAZZ", "Zachytení poslucháči: ?", session_id)
+        await asyncio.sleep(40)  # alebo podľa potreby
+
+# Spusti worker ručne z if __name__ == "__main__" alebo zo služby
