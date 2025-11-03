@@ -1,31 +1,30 @@
 import threading
-
 import requests
-import asyncio
+from fastapi import FastAPI, Request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
-from fastapi import FastAPI, Request
+import asyncio
 
-SONG_API = "http://147.232.40.154:8000/current"  # Upraviť ak je inak
+SONG_API = "http://147.232.40.154:8000/current"  # uprav podľa API
 
-app = FastAPI()
-# Globálna premena so zámkom (thread-safe pre worker)
+# Globálny thread-safe úložisko pre listeners z webhooku
 last_listeners_payload = {}
 last_lock = threading.Lock()
+
+app = FastAPI()
 
 @app.post("/callback")
 async def callback(req: Request):
     data = await req.json()
     now = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
-    # Skontroluj, či data je dict so správnymi fieldami
     required = {"timestamp", "listeners", "radio"}
     valid = isinstance(data, dict) and set(data.keys()) == required and isinstance(data["listeners"], int)
     payload = {
         "raw": data,
         "recorded_at": now,
         "raw_valid": valid,
-        "song_session_id": None  # song_session_id priraďuj podľa workeru podľa potreby
+        "song_session_id": None
     }
     with last_lock:
         last_listeners_payload.clear()
@@ -68,7 +67,6 @@ def get_current_song():
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": raw_valid,
             "song_session_id": session_id,
-            # Pre worker: uľahčene priamo title a artist
             "title": song.get("title"),
             "artist": song.get("artist"),
         }
@@ -94,13 +92,19 @@ def flatten_listener(listener_obj):
     flat["song_session_id"] = session_id
     return flat
 
+# Hlavná zmena tu!
 async def get_current_listeners(session_id=None):
-    # Tento endpoint je POST Webhook - dáta sa ti pushnú na tvoj server (viď nižšie v postupe)
-    # Ak chceš worker polling cez API (nie webhook), tu vlož reálne získanie (ak API existuje). Inak tu vráť prázdny výsledok:
-    log_radio_event("JAZZ", f"Nepodarilo sa načítať poslucháčov, používaj webhook!", session_id)
-    return {
-        "raw": {},
-        "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
-        "raw_valid": False,
-        "song_session_id": session_id
-    }
+    global last_listeners_payload
+    with last_lock:
+        payload = last_listeners_payload.copy()
+    if not payload or not payload.get("raw_valid"):
+        log_radio_event("JAZZ", f"Nepodarilo sa načítať poslucháčov, používaj webhook!", session_id)
+        return {
+            "raw": {},
+            "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
+            "raw_valid": False,
+            "song_session_id": session_id
+        }
+    # Priradíme obdržanému payloadu aktuálne session_id
+    payload["song_session_id"] = session_id
+    return payload
