@@ -372,12 +372,11 @@ def jazz_worker():
     session_id = None
     while True:
         current_song = get_song_jazz()
-        raw = current_song.get("raw", {})
-        title = raw.get("title")
-        artist = raw.get("artist")
+        title = current_song.get("title")
+        artist = current_song.get("artist")
         key = (title, artist)
         if not current_song["raw_valid"]:
-            log_radio_event(RADIO_NAME, f"Skladba sa nenašla, alebo nesprávne dáta! {raw}", session_id)
+            log_radio_event(RADIO_NAME, f"Skladba sa nenašla, alebo nesprávne dáta! {current_song.get('raw')}", session_id)
         if previous_key != key and current_song["raw_valid"]:
             session_id = str(uuid.uuid4())
             previous_key = key
