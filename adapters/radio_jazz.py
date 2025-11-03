@@ -40,13 +40,11 @@ def log_radio_event(radio_name, text, session_id=None):
     print(f"[{timestamp}] [{radio_name}]{' ' * (8 - len(radio_name))}{session_part} {text}")
 
 def is_valid_song(data):
-    # Ak je na vstupe song vo vnorenom objekte, validujeme jeho obsah
     song = data.get("song") if isinstance(data, dict) else None
     required = {"play_date", "play_time", "artist", "title"}
     return isinstance(song, dict) and set(song.keys()) == required
 
 def flatten_song(song_obj):
-    # Odporúčané: flattenuj priamo song
     raw = song_obj.get("raw", {})
     song = raw.get("song", {}) if isinstance(raw.get("song", {}), dict) else {}
     session_id = song_obj["song_session_id"]
@@ -62,7 +60,7 @@ def get_current_song():
         data = r.json()
         raw_valid = is_valid_song(data)
         session_id = str(uuid.uuid4())
-        song_fields = data.get("song", {}) if isinstance(data, dict) else {}
+        song = data.get("song", {}) if isinstance(data, dict) else {}
         if not raw_valid:
             log_radio_event("JAZZ", f"Song nenašiel požadované polia: {data}", session_id)
         return {
@@ -70,9 +68,9 @@ def get_current_song():
             "recorded_at": datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"),
             "raw_valid": raw_valid,
             "song_session_id": session_id,
-            # Uľahčí workeru prístup k title/artist v logoch:
-            "title": song_fields.get("title"),
-            "artist": song_fields.get("artist"),
+            # Pre worker: uľahčene priamo title a artist
+            "title": song.get("title"),
+            "artist": song.get("artist"),
         }
     except Exception as e:
         log_radio_event("JAZZ", f"Chyba pri získavaní songu: {e}")
