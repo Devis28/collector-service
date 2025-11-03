@@ -4,11 +4,10 @@ from fastapi import FastAPI, Request
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
-import asyncio
 
-SONG_API = "http://147.232.40.154:8000/current"  # uprav podľa API
+SONG_API = "http://147.232.40.154:8000/current"
 
-# Globálny thread-safe úložisko pre listeners z webhooku
+# Thread-safe cache for latest listeners payload from webhook
 last_listeners_payload = {}
 last_lock = threading.Lock()
 
@@ -85,14 +84,13 @@ def is_valid_listeners(data):
 
 def flatten_listener(listener_obj):
     raw = listener_obj.get("raw", {})
-    session_id = listener_obj["song_session_id"]
+    session_id = listener_obj.get("song_session_id")
     flat = {k: raw.get(k) for k in ["timestamp", "listeners", "radio"]}
     flat["recorded_at"] = listener_obj["recorded_at"]
     flat["raw_valid"] = listener_obj["raw_valid"]
     flat["song_session_id"] = session_id
     return flat
 
-# Hlavná zmena tu!
 async def get_current_listeners(session_id=None):
     global last_listeners_payload
     with last_lock:
@@ -105,6 +103,5 @@ async def get_current_listeners(session_id=None):
             "raw_valid": False,
             "song_session_id": session_id
         }
-    # Priradíme obdržanému payloadu aktuálne session_id
     payload["song_session_id"] = session_id
     return payload
