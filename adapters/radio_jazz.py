@@ -126,7 +126,7 @@ async def main_jazz_worker():
         if not listeners_data["raw_valid"]:
             log_radio_event("JAZZ", f"Nepodarilo sa získať poslucháčov alebo nesprávne dáta! {raw_list}", session_id)
         log_radio_event("JAZZ", f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
-        await asyncio.sleep(40)
+        await asyncio.sleep(30)
 
 @app.on_event("startup")
 async def start_worker():

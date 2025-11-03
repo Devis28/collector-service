@@ -51,7 +51,7 @@ from adapters.radio_jazz import (
     log_radio_event,
 )
 
-INTERVAL = 40
+INTERVAL = 30
 INTERVAL_VLNA = 40
 BATCH_TIME = 7200
 
