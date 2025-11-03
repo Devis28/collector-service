@@ -1,10 +1,37 @@
+import threading
+
 import requests
 import asyncio
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
+from fastapi import FastAPI, Request
 
 SONG_API = "http://147.232.40.154:8000/current"  # Upraviť ak je inak
+
+app = FastAPI()
+# Globálna premena so zámkom (thread-safe pre worker)
+last_listeners_payload = {}
+last_lock = threading.Lock()
+
+@app.post("/callback")
+async def callback(req: Request):
+    data = await req.json()
+    now = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
+    # Skontroluj, či data je dict so správnymi fieldami
+    required = {"timestamp", "listeners", "radio"}
+    valid = isinstance(data, dict) and set(data.keys()) == required and isinstance(data["listeners"], int)
+    payload = {
+        "raw": data,
+        "recorded_at": now,
+        "raw_valid": valid,
+        "song_session_id": None  # song_session_id priraďuj podľa workeru podľa potreby
+    }
+    with last_lock:
+        last_listeners_payload.clear()
+        last_listeners_payload.update(payload)
+    print(f"[{now}] [JAZZ] Webhook: {data}")
+    return {"status": "ok"}
 
 def log_radio_event(radio_name, text, session_id=None):
     now = datetime.now(ZoneInfo("Europe/Bratislava"))
