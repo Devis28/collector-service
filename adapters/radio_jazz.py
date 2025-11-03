@@ -6,9 +6,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import uuid
 
-SONG_API = "http://147.232.40.154:8000/current"  # Ak treba, uprav podľa rádia
+SONG_API = "http://147.232.40.154:8000/current"
 
-# Globálne thread-safe úložisko posledného listeners payloadu
 last_listeners_payload = {}
 last_lock = threading.Lock()
 
@@ -127,7 +126,7 @@ async def main_jazz_worker():
         if not listeners_data["raw_valid"]:
             log_radio_event("JAZZ", f"Nepodarilo sa získať poslucháčov alebo nesprávne dáta! {raw_list}", session_id)
         log_radio_event("JAZZ", f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
-        await asyncio.sleep(40)  # uprav na požadovaný interval
+        await asyncio.sleep(40)
 
 @app.on_event("startup")
 async def start_worker():
