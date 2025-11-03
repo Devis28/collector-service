@@ -14,6 +14,7 @@ last_lock = threading.Lock()
 app = FastAPI()
 
 @app.post("/callback")
+@app.post("/callback-jazz")
 async def callback(req: Request):
     data = await req.json()
     now = datetime.now(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S")
