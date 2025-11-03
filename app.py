@@ -43,6 +43,13 @@ from adapters.radio_expres import (
     flatten_song as flatten_expres_song,
     flatten_listener as flatten_expres_listener
 )
+from adapters.radio_jazz import (
+    get_current_song as get_song_jazz,
+    get_current_listeners as get_listeners_jazz,
+    flatten_song as flatten_jazz_song,
+    flatten_listener as flatten_jazz_listener,
+    log_radio_event,
+)
 
 INTERVAL = 40
 INTERVAL_VLNA = 40
@@ -356,6 +363,55 @@ def expres_worker():
             last_batch_time = time.time()
         time.sleep(INTERVAL)
 
+def jazz_worker():
+    RADIO_NAME = "JAZZ"
+    last_batch_time = time.time()
+    song_data_batch = []
+    listeners_data_batch = []
+    previous_key = None
+    session_id = None
+    while True:
+        current_song = get_song_jazz()
+        raw = current_song.get("raw", {})
+        title = raw.get("title")
+        artist = raw.get("artist")
+        key = (title, artist)
+        if not current_song["raw_valid"]:
+            log_radio_event(RADIO_NAME, f"Skladba sa nenašla, alebo nesprávne dáta! {raw}", session_id)
+        if previous_key != key and current_song["raw_valid"]:
+            session_id = str(uuid.uuid4())
+            previous_key = key
+            current_song["song_session_id"] = session_id
+            log_radio_event(RADIO_NAME, f"Zachytená skladba: {title} | {artist}", session_id)
+            song_data_batch.append(flatten_jazz_song(current_song))
+        else:
+            log_radio_event(RADIO_NAME, f"Skladba nezmenená: {title} | {artist}", session_id)
+        listeners_data = asyncio.run(get_listeners_jazz(session_id))
+        listeners_data["song_session_id"] = session_id
+        raw_list = listeners_data.get("raw", {})
+        if not listeners_data["raw_valid"]:
+            log_radio_event(RADIO_NAME, f"Nepodarilo sa získať poslucháčov alebo nesprávne dáta! {raw_list}", session_id)
+        log_radio_event(RADIO_NAME, f"Zachytení poslucháči: {raw_list.get('listeners', '?')}", session_id)
+        listeners_data_batch.append(flatten_jazz_listener(listeners_data))
+        if time.time() - last_batch_time >= BATCH_TIME:
+            now = datetime.now(ZoneInfo("Europe/Bratislava"))
+            date_str = now.strftime("%d-%m-%Y")
+            timestamp = now.strftime("%d-%m-%YT%H-%M-%S")
+            song_path_local = f"{timestamp}_jazz_song.json"
+            listeners_path_local = f"{timestamp}_jazz_listeners.json"
+            song_path_r2 = f"bronze/JAZZ/song/{date_str}/{timestamp}.json"
+            listeners_path_r2 = f"bronze/JAZZ/listeners/{date_str}/{timestamp}.json"
+            save_json(song_data_batch, song_path_local)
+            save_json(listeners_data_batch, listeners_path_local)
+            upload_file(song_path_local, song_path_r2)
+            upload_file(listeners_path_local, listeners_path_r2)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {song_path_r2}", session_id)
+            log_radio_event(RADIO_NAME, f"Dáta nahrané do Cloudflare: {listeners_path_r2}", session_id)
+            song_data_batch.clear()
+            listeners_data_batch.clear()
+            last_batch_time = time.time()
+        time.sleep(INTERVAL)
+
 def main():
     from adapters.radio_expres import start_expres_webhook
     start_expres_webhook()
@@ -365,6 +421,7 @@ def main():
     threading.Thread(target=vlna_worker, daemon=True).start()
     threading.Thread(target=beta_worker, daemon=True).start()
     threading.Thread(target=expres_worker, daemon=True).start()
+    threading.Thread(target=jazz_worker(), daemon=True).start()
     while True:
         time.sleep(60)
 
